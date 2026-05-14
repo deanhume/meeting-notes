@@ -4,7 +4,7 @@ const path = require('path');
 
 const app = express();
 const PORT = 3000;
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = 'C:\\Users\\deanhume\\OneDrive - Microsoft\\Meeting-notes-tool\\data';
 const PEOPLE_FILE = path.join(DATA_DIR, 'people.json');
 
 app.use(express.json());
