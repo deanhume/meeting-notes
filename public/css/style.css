@@ -54,6 +54,26 @@ body {
 .sidebar-header {
   padding: 20px 18px 16px;
   border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+  line-height: 1;
+}
+
+.settings-btn:hover {
+  background: var(--hover);
+  color: var(--text);
 }
 
 .logo {
@@ -550,6 +570,7 @@ body {
 }
 
 .modal-wide { max-width: 620px; }
+.modal-medium { max-width: 520px; }
 .modal-sm   { max-width: 360px; }
 
 @keyframes slideModal { from { opacity: 0; transform: translateY(-12px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
@@ -722,3 +743,23 @@ body {
 
 /* ── Utilities ────────────────────────────────────────────── */
 .hidden { display: none !important; }
+
+/* ── Settings ──────────────────────────────────────────────── */
+.data-location-input {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.data-location-input input {
+  flex: 1;
+  background: var(--bg-secondary);
+  cursor: default;
+}
+
+.field-note {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 6px;
+  font-family: var(--font-mono);
+}

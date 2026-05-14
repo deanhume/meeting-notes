@@ -363,6 +363,54 @@ async function saveQuestionsModal() {
   }
 }
 
+/* ── Settings Modal ───────────────────────────────────────── */
+let pendingDataLocation = null;
+
+async function openSettings() {
+  try {
+    const settings = await api('GET', '/api/settings');
+    document.getElementById('dataLocationInput').value = settings.dataLocation;
+    document.getElementById('dataLocationNote').textContent = `Current: ${settings.dataLocation}`;
+    pendingDataLocation = settings.dataLocation;
+    document.getElementById('settingsModal').classList.remove('hidden');
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+function closeSettingsModal() {
+  document.getElementById('settingsModal').classList.add('hidden');
+  pendingDataLocation = null;
+}
+
+async function selectFolder() {
+  if (window.electronAPI && window.electronAPI.selectFolder) {
+    const folder = await window.electronAPI.selectFolder();
+    if (folder) {
+      pendingDataLocation = folder;
+      document.getElementById('dataLocationInput').value = folder;
+    }
+  } else {
+    showError('Folder selection only available in desktop app');
+  }
+}
+
+async function saveSettingsModal() {
+  if (!pendingDataLocation) {
+    showError('Please select a data location');
+    return;
+  }
+
+  try {
+    await api('PUT', '/api/settings/data-location', { dataLocation: pendingDataLocation });
+    closeSettingsModal();
+    // Reload the page to use new data location
+    window.location.reload();
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
 /* ── Confirm Modal ────────────────────────────────────────── */
 function showConfirm(title, message, onOk) {
   document.getElementById('confirmTitle').textContent = title;
@@ -421,6 +469,9 @@ function wireEvents() {
   // Manage questions button
   document.getElementById('manageQuestionsBtn').addEventListener('click', openManageQuestions);
 
+  // Settings button
+  document.getElementById('settingsBtn').addEventListener('click', openSettings);
+
   // Person modal
   document.getElementById('personModalClose').addEventListener('click', closePersonModal);
   document.getElementById('personModalCancel').addEventListener('click', closePersonModal);
@@ -455,10 +506,20 @@ function wireEvents() {
     if (e.target === document.getElementById('questionsModal')) closeQuestionsModal();
   });
 
+  // Settings modal
+  document.getElementById('settingsModalClose').addEventListener('click', closeSettingsModal);
+  document.getElementById('settingsModalCancel').addEventListener('click', closeSettingsModal);
+  document.getElementById('settingsModalSave').addEventListener('click', saveSettingsModal);
+  document.getElementById('selectFolderBtn').addEventListener('click', selectFolder);
+  document.getElementById('settingsModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('settingsModal')) closeSettingsModal();
+  });
+
   // Keyboard shortcuts
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if (!document.getElementById('confirmModal').classList.contains('hidden'))  closeConfirm();
+      else if (!document.getElementById('settingsModal').classList.contains('hidden')) closeSettingsModal();
       else if (!document.getElementById('questionsModal').classList.contains('hidden')) closeQuestionsModal();
       else if (!document.getElementById('noteModal').classList.contains('hidden')) closeNoteModal();
       else if (!document.getElementById('personModal').classList.contains('hidden')) closePersonModal();

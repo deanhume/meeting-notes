@@ -2,12 +2,16 @@
   "name": "meeting-notes",
   "version": "1.0.0",
   "description": "Local meeting notes tracker",
-  "main": "server.js",
+  "main": "main.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "npx electron .",
+    "dev": "npx electron .",
+    "web": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "electron": "^42.0.1"
   }
 }

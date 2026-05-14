@@ -21,6 +21,7 @@
             <div class="logo-sub">Personal log</div>
           </div>
         </div>
+        <button class="settings-btn" id="settingsBtn" title="Settings">⚙</button>
       </div>
 
       <div class="sidebar-search">
@@ -177,6 +178,31 @@
       <div class="modal-footer">
         <button class="btn-ghost" id="questionsModalCancel">Cancel</button>
         <button class="btn-primary" id="questionsModalSave">Save questions</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay hidden" id="settingsModal">
+    <div class="modal modal-medium">
+      <div class="modal-header">
+        <h3>Settings</h3>
+        <button class="modal-close" id="settingsModalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label>Data Storage Location</label>
+          <p class="field-help">Choose where to store your meeting notes data</p>
+          <div class="data-location-input">
+            <input type="text" id="dataLocationInput" readonly placeholder="Select folder...">
+            <button class="btn-secondary" id="selectFolderBtn">Browse...</button>
+          </div>
+          <p class="field-note" id="dataLocationNote"></p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" id="settingsModalCancel">Cancel</button>
+        <button class="btn-primary" id="settingsModalSave">Save & Reload</button>
       </div>
     </div>
   </div>
