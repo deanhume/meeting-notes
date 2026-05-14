@@ -3,15 +3,40 @@
   "version": "1.0.0",
   "description": "Local meeting notes tracker",
   "main": "main.js",
+  "author": "Dean Hume",
   "scripts": {
     "start": "npx electron .",
     "dev": "npx electron .",
-    "web": "node server.js"
+    "web": "node server.js",
+    "build": "npx electron-builder --win --x64",
+    "build:dir": "npx electron-builder --win --x64 --dir"
+  },
+  "build": {
+    "appId": "com.deanhume.meetingnotes",
+    "productName": "Meeting Notes",
+    "win": {
+      "target": "nsis",
+      "icon": "public/images/logo-256.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "server.js",
+      "public/**/*",
+      "package.json"
+    ]
   },
   "dependencies": {
     "express": "^4.18.2"
   },
   "devDependencies": {
-    "electron": "^42.0.1"
+    "electron": "42.0.1",
+    "electron-builder": "^26.8.1"
   }
 }

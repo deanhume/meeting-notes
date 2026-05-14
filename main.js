@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const express = require('express');
 const fs = require('fs');
@@ -32,8 +32,11 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
     },
-    icon: path.join(__dirname, 'public', 'favicon.ico')
+    icon: path.join(__dirname, 'public', 'images', 'logo-256.png'),
+    autoHideMenuBar: true
   });
+
+  Menu.setApplicationMenu(null);
 
   mainWindow.loadURL(`http://localhost:${PORT}`);
 
@@ -293,8 +296,8 @@ function startServer() {
   });
 
   server = expressApp.listen(PORT, () => {
-    console.log(`📋 Meeting Notes server running at http://localhost:${PORT}`);
-    console.log(`📁 Data stored in: ${DATA_DIR}`);
+    console.log(`Meeting Notes server running at http://localhost:${PORT}`);
+    console.log(`Data stored in: ${DATA_DIR}`);
   });
 }
 
