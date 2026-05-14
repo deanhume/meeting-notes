@@ -6,6 +6,7 @@ const app = express();
 const PORT = 3000;
 const DATA_DIR = 'C:\\Users\\deanhume\\OneDrive - Microsoft\\Meeting-notes-tool\\data';
 const PEOPLE_FILE = path.join(DATA_DIR, 'people.json');
+const QUESTIONS_FILE = path.join(DATA_DIR, 'questions.json');
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -13,6 +14,31 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(PEOPLE_FILE)) fs.writeFileSync(PEOPLE_FILE, JSON.stringify([]));
+
+// Default questions
+const defaultQuestions = [
+  "What are the biggest technical challenges your teams are facing right now?",
+  "How are you balancing technical debt with new feature development?",
+  "What's your current perspective on our architecture and tech stack?",
+  "Are there any areas where you feel the engineering organization is falling behind?",
+  "What technical investments should we be prioritizing in the next quarter?",
+  "How are your teams handling production incidents and system reliability?",
+  "What concerns do you have about our current technical direction?",
+  "Are there any skill gaps or hiring needs in your organization?",
+  "How effective is cross-team collaboration and knowledge sharing?",
+  "What technical standards or practices should we be implementing?",
+  "Are there any bottlenecks in your development processes?",
+  "How are you approaching AI/ML integration in your products?",
+  "What's your assessment of our security posture and practices?",
+  "Are the tools and infrastructure supporting your teams effectively?",
+  "What emerging technologies should we be paying attention to?",
+  "How are you managing technical risk across your portfolio?",
+  "What feedback are you hearing from your engineering leads?",
+  "Are there any organizational changes that would improve delivery?",
+  "What technical metrics are you most focused on right now?",
+  "How can I better support you and your leadership team?"
+];
+if (!fs.existsSync(QUESTIONS_FILE)) fs.writeFileSync(QUESTIONS_FILE, JSON.stringify(defaultQuestions, null, 2));
 
 // Helpers
 function loadPeople() {
@@ -39,6 +65,14 @@ function saveNotes(personId, notes) {
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+}
+
+function loadQuestions() {
+  return JSON.parse(fs.readFileSync(QUESTIONS_FILE, 'utf8'));
+}
+
+function saveQuestions(questions) {
+  fs.writeFileSync(QUESTIONS_FILE, JSON.stringify(questions, null, 2));
 }
 
 // ── People API ──────────────────────────────────────────────
@@ -149,6 +183,25 @@ app.delete('/api/people/:id/notes/:noteId', (req, res) => {
   notes.splice(idx, 1);
   saveNotes(req.params.id, notes);
   res.json({ ok: true });
+});
+
+// ── Questions API ───────────────────────────────────────────
+
+// GET all questions
+app.get('/api/questions', (req, res) => {
+  res.json(loadQuestions());
+});
+
+// PUT update all questions
+app.put('/api/questions', (req, res) => {
+  const { questions } = req.body;
+  if (!Array.isArray(questions)) return res.status(400).json({ error: 'Questions must be an array' });
+  
+  const cleaned = questions.map(q => (q || '').trim()).filter(q => q.length > 0);
+  if (cleaned.length === 0) return res.status(400).json({ error: 'At least one question is required' });
+  
+  saveQuestions(cleaned);
+  res.json(cleaned);
 });
 
 // ── Catch-all ───────────────────────────────────────────────

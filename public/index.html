@@ -68,7 +68,10 @@
 
         <div class="notes-toolbar">
           <div class="notes-count" id="notesCount"></div>
-          <button class="btn-primary" id="newNoteBtn">+ New note</button>
+          <div class="notes-toolbar-right">
+            <button class="btn-ghost" id="manageQuestionsBtn">Edit questions</button>
+            <button class="btn-primary" id="newNoteBtn">+ New note</button>
+          </div>
         </div>
 
         <div class="notes-list" id="notesList"></div>
@@ -116,6 +119,15 @@
         <button class="modal-close" id="noteModalClose">✕</button>
       </div>
       <div class="modal-body">
+        <div class="question-prompt" id="questionPrompt">
+          <div class="question-prompt-label">💡 Question to ask:</div>
+          <div class="question-prompt-content">
+            <div class="question-text" id="questionText">Loading...</div>
+            <button class="btn-icon" id="refreshQuestionBtn" title="Get another question">
+              <img src="/images/refresh.png" alt="Refresh" class="icon-refresh">
+            </button>
+          </div>
+        </div>
         <div class="field">
           <label>Meeting title <span class="optional">(optional)</span></label>
           <input type="text" id="noteTitleInput" placeholder="e.g. 1:1 — Q2 planning" autocomplete="off">
@@ -144,6 +156,27 @@
       <div class="modal-footer">
         <button class="btn-ghost" id="confirmCancel">Cancel</button>
         <button class="btn-danger-solid" id="confirmOk">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manage Questions Modal -->
+  <div class="modal-overlay hidden" id="questionsModal">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3>Manage Questions</h3>
+        <button class="modal-close" id="questionsModalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="field-help">Add or edit questions that will be randomly suggested when creating new meeting notes.</p>
+        <div class="field">
+          <label>Questions (one per line)</label>
+          <textarea id="questionsTextarea" placeholder="Enter questions, one per line..." rows="15"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" id="questionsModalCancel">Cancel</button>
+        <button class="btn-primary" id="questionsModalSave">Save questions</button>
       </div>
     </div>
   </div>

@@ -6,6 +6,8 @@ let editingPersonId = null;
 let editingNoteId = null;
 let confirmCallback = null;
 let noteCountCache = {};
+let questions = [];
+let currentQuestion = '';
 
 /* ── API helpers ──────────────────────────────────────────── */
 async function api(method, path, body) {
@@ -261,11 +263,23 @@ async function deletePerson(id) {
 }
 
 /* ── Note Modal ───────────────────────────────────────────── */
+function getRandomQuestion() {
+  if (questions.length === 0) return 'No questions available';
+  const idx = Math.floor(Math.random() * questions.length);
+  return questions[idx];
+}
+
+function refreshQuestion() {
+  currentQuestion = getRandomQuestion();
+  document.getElementById('questionText').textContent = currentQuestion;
+}
+
 function openNewNote() {
   editingNoteId = null;
   document.getElementById('noteModalTitle').textContent = 'New meeting note';
   document.getElementById('noteTitleInput').value = '';
   document.getElementById('noteContentInput').value = '';
+  refreshQuestion();
   document.getElementById('noteModal').classList.remove('hidden');
   document.getElementById('noteTitleInput').focus();
 }
@@ -321,6 +335,34 @@ async function deleteNote(noteId) {
   });
 }
 
+/* ── Questions Modal ──────────────────────────────────────── */
+function openManageQuestions() {
+  document.getElementById('questionsTextarea').value = questions.join('\n');
+  document.getElementById('questionsModal').classList.remove('hidden');
+  document.getElementById('questionsTextarea').focus();
+}
+
+function closeQuestionsModal() {
+  document.getElementById('questionsModal').classList.add('hidden');
+}
+
+async function saveQuestionsModal() {
+  const text = document.getElementById('questionsTextarea').value;
+  const newQuestions = text.split('\n').map(q => q.trim()).filter(q => q.length > 0);
+  
+  if (newQuestions.length === 0) {
+    showError('Please add at least one question');
+    return;
+  }
+
+  try {
+    questions = await api('PUT', '/api/questions', { questions: newQuestions });
+    closeQuestionsModal();
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
 /* ── Confirm Modal ────────────────────────────────────────── */
 function showConfirm(title, message, onOk) {
   document.getElementById('confirmTitle').textContent = title;
@@ -373,6 +415,12 @@ function wireEvents() {
   // New note button
   document.getElementById('newNoteBtn').addEventListener('click', openNewNote);
 
+  // Refresh question button
+  document.getElementById('refreshQuestionBtn').addEventListener('click', refreshQuestion);
+
+  // Manage questions button
+  document.getElementById('manageQuestionsBtn').addEventListener('click', openManageQuestions);
+
   // Person modal
   document.getElementById('personModalClose').addEventListener('click', closePersonModal);
   document.getElementById('personModalCancel').addEventListener('click', closePersonModal);
@@ -399,10 +447,19 @@ function wireEvents() {
     closeConfirm();
   });
 
+  // Questions modal
+  document.getElementById('questionsModalClose').addEventListener('click', closeQuestionsModal);
+  document.getElementById('questionsModalCancel').addEventListener('click', closeQuestionsModal);
+  document.getElementById('questionsModalSave').addEventListener('click', saveQuestionsModal);
+  document.getElementById('questionsModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('questionsModal')) closeQuestionsModal();
+  });
+
   // Keyboard shortcuts
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if (!document.getElementById('confirmModal').classList.contains('hidden'))  closeConfirm();
+      else if (!document.getElementById('questionsModal').classList.contains('hidden')) closeQuestionsModal();
       else if (!document.getElementById('noteModal').classList.contains('hidden')) closeNoteModal();
       else if (!document.getElementById('personModal').classList.contains('hidden')) closePersonModal();
     }
@@ -410,6 +467,7 @@ function wireEvents() {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       if (!document.getElementById('noteModal').classList.contains('hidden')) saveNoteModal();
       else if (!document.getElementById('personModal').classList.contains('hidden')) savePersonModal();
+      else if (!document.getElementById('questionsModal').classList.contains('hidden')) saveQuestionsModal();
     }
   });
 }
@@ -418,6 +476,7 @@ function wireEvents() {
 async function init() {
   try {
     people = await api('GET', '/api/people');
+    questions = await api('GET', '/api/questions');
     renderPeopleList();
     wireEvents();
     await loadNoteCounts();

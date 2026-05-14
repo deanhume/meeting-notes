@@ -327,6 +327,12 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.notes-toolbar-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .notes-count {
   font-size: 12px;
   font-family: var(--font-mono);
@@ -638,6 +644,80 @@ body {
   line-height: 1.65;
   min-height: 180px;
   font-size: 13px;
+}
+
+.field-help {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+/* ── Question Prompt ──────────────────────────────────────── */
+.question-prompt {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.question-prompt-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.question-prompt-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.question-text {
+  flex: 1;
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 500;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+.btn-icon {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text-mid);
+  font-size: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.btn-icon:hover {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+  background: rgba(201, 169, 110, 0.08);
+}
+
+.icon-refresh {
+  width: 16px;
+  height: 16px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.btn-icon:hover .icon-refresh {
+  opacity: 1;
 }
 
 /* ── Utilities ────────────────────────────────────────────── */
