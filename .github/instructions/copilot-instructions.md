@@ -30,7 +30,8 @@ This is a local web application for tracking meeting notes with people in your o
 - `data/people.json` - Array of person objects
 - `data/notes_<id>.json` - Array of note objects per person
 - Person: `{id, name, role, team, createdAt}`
-- Note: `{id, title, content, createdAt, updatedAt}`
+- Note: `{id, title, content, tags, createdAt, updatedAt}`
+- Tags: Array of lowercase strings (max 20 per note, each ≤50 chars)
 
 ## Coding Conventions
 
@@ -83,6 +84,8 @@ meeting-notes/
 4. **Cascading deletes**: Delete person removes their notes file
 5. **Newest first**: Notes displayed in reverse chronological order
 6. **Avatar generation**: Person avatars use initials
+7. **Note tagging**: Notes can be tagged; tags are filterable per person and auto-suggested from previously used tags
+8. **Tag API**: `GET /api/tags` returns all unique tags across all notes
 
 ## Guidelines for Copilot
 

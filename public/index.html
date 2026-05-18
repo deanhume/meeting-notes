@@ -70,6 +70,7 @@
         <div class="notes-toolbar">
           <div class="notes-count" id="notesCount"></div>
           <div class="notes-toolbar-right">
+            <div class="tag-filter" id="tagFilter"></div>
             <button class="btn-ghost" id="manageQuestionsBtn">Edit questions</button>
             <button class="btn-primary" id="newNoteBtn">+ New note</button>
           </div>
@@ -132,6 +133,14 @@
         <div class="field">
           <label>Meeting title <span class="optional">(optional)</span></label>
           <input type="text" id="noteTitleInput" placeholder="e.g. 1:1 — Q2 planning" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Tags <span class="optional">(optional)</span></label>
+          <div class="tags-input-wrapper" id="tagsInputWrapper">
+            <div class="tags-input-pills" id="tagsInputPills"></div>
+            <input type="text" id="noteTagsInput" placeholder="Type a tag and press Enter…" autocomplete="off">
+          </div>
+          <div class="tags-suggestions hidden" id="tagsSuggestions"></div>
         </div>
         <div class="field">
           <label>Notes <span class="required">*</span></label>

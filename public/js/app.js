@@ -8,6 +8,9 @@ let confirmCallback = null;
 let noteCountCache = {};
 let questions = [];
 let currentQuestion = '';
+let allTags = [];
+let currentTags = [];
+let filterTag = null;
 
 /* ── API helpers ──────────────────────────────────────────── */
 async function api(method, path, body) {
@@ -83,6 +86,7 @@ function renderPeopleList(filter = '') {
 /* ── Select Person ────────────────────────────────────────── */
 async function selectPerson(id) {
   currentPersonId = id;
+  filterTag = null;
   const person = people.find(p => p.id === id);
   if (!person) return;
 
@@ -117,16 +121,28 @@ async function selectPerson(id) {
 function renderNotes() {
   const list = document.getElementById('notesList');
   const count = document.getElementById('notesCount');
-  count.textContent = `${currentNotes.length} note${currentNotes.length !== 1 ? 's' : ''}`;
 
-  if (currentNotes.length === 0) {
-    list.innerHTML = `<div class="note-empty">No notes yet — start recording your meetings.</div>`;
+  // Apply tag filter
+  const displayNotes = filterTag
+    ? currentNotes.filter(n => n.tags && n.tags.includes(filterTag))
+    : currentNotes;
+
+  count.textContent = `${displayNotes.length} note${displayNotes.length !== 1 ? 's' : ''}${filterTag ? ` tagged "${filterTag}"` : ''}`;
+
+  // Render tag filter indicator
+  renderTagFilter();
+
+  if (displayNotes.length === 0) {
+    list.innerHTML = `<div class="note-empty">${filterTag ? 'No notes with this tag.' : 'No notes yet — start recording your meetings.'}</div>`;
     return;
   }
 
-  list.innerHTML = currentNotes.map(note => {
+  list.innerHTML = displayNotes.map(note => {
     const isEdited = note.updatedAt !== note.createdAt;
     const longNote = note.content.length > 400 || note.content.split('\n').length > 5;
+    const tagsHtml = (note.tags && note.tags.length > 0)
+      ? `<div class="note-tags">${note.tags.map(t => `<span class="note-tag" data-tag="${escHtml(t)}">${escHtml(t)}</span>`).join('')}</div>`
+      : '';
     return `
       <div class="note-card" data-note-id="${note.id}">
         <div class="note-card-header">
@@ -140,6 +156,7 @@ function renderNotes() {
           </div>
         </div>
         <div class="note-content ${longNote ? 'collapsed' : ''}">${escHtml(note.content)}</div>
+        ${tagsHtml}
         <div class="note-footer">
           ${longNote ? `<button class="note-expand-btn" data-expanded="false">Show more ↓</button>` : '<span></span>'}
           <div class="note-actions">
@@ -175,6 +192,111 @@ function renderNotes() {
       if (action === 'edit')   openEditNote(noteId);
       if (action === 'delete') deleteNote(noteId);
     });
+  });
+
+  // Tag click to filter
+  list.querySelectorAll('.note-tag').forEach(el => {
+    el.addEventListener('click', () => {
+      filterTag = el.dataset.tag;
+      renderNotes();
+    });
+  });
+}
+
+/* ── Tag Filter ───────────────────────────────────────────── */
+function renderTagFilter() {
+  const container = document.getElementById('tagFilter');
+  if (!filterTag) {
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = `
+    <span class="tag-filter-pill">
+      ${escHtml(filterTag)}
+      <button class="tag-filter-clear" id="clearTagFilter">✕</button>
+    </span>`;
+  document.getElementById('clearTagFilter').addEventListener('click', () => {
+    filterTag = null;
+    renderNotes();
+  });
+}
+
+/* ── Tags Input (Note Modal) ─────────────────────────────── */
+function renderTagsPills() {
+  const container = document.getElementById('tagsInputPills');
+  container.innerHTML = currentTags.map((t, i) => `
+    <span class="tag-pill">
+      ${escHtml(t)}
+      <button class="tag-pill-remove" data-index="${i}">✕</button>
+    </span>
+  `).join('');
+  container.querySelectorAll('.tag-pill-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      currentTags.splice(parseInt(btn.dataset.index), 1);
+      renderTagsPills();
+    });
+  });
+}
+
+function showTagSuggestions(query) {
+  const container = document.getElementById('tagsSuggestions');
+  if (!query) {
+    container.classList.add('hidden');
+    return;
+  }
+  const matches = allTags.filter(t => 
+    t.includes(query.toLowerCase()) && !currentTags.includes(t)
+  ).slice(0, 5);
+  if (matches.length === 0) {
+    container.classList.add('hidden');
+    return;
+  }
+  container.innerHTML = matches.map(t => 
+    `<div class="tags-suggestion-item" data-tag="${escHtml(t)}">${escHtml(t)}</div>`
+  ).join('');
+  container.classList.remove('hidden');
+  container.querySelectorAll('.tags-suggestion-item').forEach(el => {
+    el.addEventListener('click', () => {
+      addTag(el.dataset.tag);
+      container.classList.add('hidden');
+    });
+  });
+}
+
+function addTag(tag) {
+  const cleaned = tag.trim().toLowerCase().substring(0, 50);
+  if (!cleaned || currentTags.includes(cleaned)) return;
+  if (currentTags.length >= 20) return;
+  currentTags.push(cleaned);
+  renderTagsPills();
+  document.getElementById('noteTagsInput').value = '';
+  document.getElementById('tagsSuggestions').classList.add('hidden');
+}
+
+function wireTagsInput() {
+  const input = document.getElementById('noteTagsInput');
+  const wrapper = document.getElementById('tagsInputWrapper');
+
+  wrapper.addEventListener('click', () => input.focus());
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      if (input.value.trim()) addTag(input.value);
+    }
+    if (e.key === 'Backspace' && !input.value && currentTags.length > 0) {
+      currentTags.pop();
+      renderTagsPills();
+    }
+  });
+
+  input.addEventListener('input', () => {
+    showTagSuggestions(input.value.trim());
+  });
+
+  input.addEventListener('blur', () => {
+    setTimeout(() => document.getElementById('tagsSuggestions').classList.add('hidden'), 150);
   });
 }
 
@@ -276,9 +398,12 @@ function refreshQuestion() {
 
 function openNewNote() {
   editingNoteId = null;
+  currentTags = [];
   document.getElementById('noteModalTitle').textContent = 'New meeting note';
   document.getElementById('noteTitleInput').value = '';
   document.getElementById('noteContentInput').value = '';
+  document.getElementById('noteTagsInput').value = '';
+  renderTagsPills();
   refreshQuestion();
   document.getElementById('noteModal').classList.remove('hidden');
   document.getElementById('noteTitleInput').focus();
@@ -288,9 +413,12 @@ function openEditNote(noteId) {
   const note = currentNotes.find(n => n.id === noteId);
   if (!note) return;
   editingNoteId = noteId;
+  currentTags = [...(note.tags || [])];
   document.getElementById('noteModalTitle').textContent = 'Edit note';
   document.getElementById('noteTitleInput').value = note.title || '';
   document.getElementById('noteContentInput').value = note.content;
+  document.getElementById('noteTagsInput').value = '';
+  renderTagsPills();
   document.getElementById('noteModal').classList.remove('hidden');
   document.getElementById('noteTitleInput').focus();
 }
@@ -302,20 +430,24 @@ function closeNoteModal() {
 async function saveNoteModal() {
   const title = document.getElementById('noteTitleInput').value.trim();
   const content = document.getElementById('noteContentInput').value.trim();
+  const tags = [...currentTags];
 
   if (!content) { document.getElementById('noteContentInput').focus(); return; }
 
   try {
     if (editingNoteId) {
-      const updated = await api('PUT', `/api/people/${currentPersonId}/notes/${editingNoteId}`, { title, content });
+      const updated = await api('PUT', `/api/people/${currentPersonId}/notes/${editingNoteId}`, { title, content, tags });
       const idx = currentNotes.findIndex(n => n.id === editingNoteId);
       if (idx !== -1) currentNotes[idx] = updated;
     } else {
-      const note = await api('POST', `/api/people/${currentPersonId}/notes`, { title, content });
+      const note = await api('POST', `/api/people/${currentPersonId}/notes`, { title, content, tags });
       currentNotes.unshift(note); // newest first
       noteCountCache[currentPersonId] = (noteCountCache[currentPersonId] || 0) + 1;
       renderPeopleList(document.getElementById('searchPeople').value);
     }
+    // Update allTags with any new tags
+    tags.forEach(t => { if (!allTags.includes(t)) allTags.push(t); });
+    allTags.sort();
     renderNotes();
     closeNoteModal();
   } catch (e) {
@@ -538,8 +670,10 @@ async function init() {
   try {
     people = await api('GET', '/api/people');
     questions = await api('GET', '/api/questions');
+    allTags = await api('GET', '/api/tags');
     renderPeopleList();
     wireEvents();
+    wireTagsInput();
     await loadNoteCounts();
   } catch (e) {
     document.body.innerHTML = `<div style="padding:40px;font-family:monospace;color:#c0504d;">Failed to connect to server: ${e.message}</div>`;

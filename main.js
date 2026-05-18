@@ -92,6 +92,20 @@ function validateNoteData(data) {
   if (data.title && (typeof data.title !== 'string' || data.title.length > 500)) {
     errors.push('Title must be 500 characters or less');
   }
+
+  if (data.tags !== undefined) {
+    if (!Array.isArray(data.tags)) {
+      errors.push('Tags must be an array');
+    } else {
+      if (data.tags.length > 20) {
+        errors.push('Maximum 20 tags per note');
+      }
+      const invalidTags = data.tags.filter(t => typeof t !== 'string' || t.length > 50 || t.length === 0);
+      if (invalidTags.length > 0) {
+        errors.push('Each tag must be a non-empty string of 50 characters or less');
+      }
+    }
+  }
   
   return errors;
 }
@@ -331,6 +345,7 @@ function startServer() {
       id: generateId(),
       title: sanitizeString(req.body.title || '', 500),
       content: sanitizeString(req.body.content, 50000),
+      tags: (req.body.tags || []).map(t => sanitizeString(t, 50).toLowerCase()).filter(t => t.length > 0),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -358,6 +373,7 @@ function startServer() {
       ...notes[idx],
       title: sanitizeString(req.body.title || '', 500),
       content: sanitizeString(req.body.content, 50000),
+      tags: (req.body.tags || []).map(t => sanitizeString(t, 50).toLowerCase()).filter(t => t.length > 0),
       updatedAt: new Date().toISOString()
     };
     saveNotes(req.params.id, notes);
@@ -445,6 +461,23 @@ function startServer() {
     } catch (err) {
       res.status(400).json({ error: 'Invalid data location: ' + err.message });
     }
+  });
+
+  // ── Tags API ────────────────────────────────────────────────
+
+  // GET all unique tags across all notes
+  expressApp.get('/api/tags', (req, res) => {
+    const people = loadPeople();
+    const tagSet = new Set();
+    people.forEach(p => {
+      const notes = loadNotes(p.id);
+      notes.forEach(n => {
+        if (n.tags && Array.isArray(n.tags)) {
+          n.tags.forEach(t => tagSet.add(t));
+        }
+      });
+    });
+    res.json([...tagSet].sort());
   });
 
   // ── Catch-all ───────────────────────────────────────────────

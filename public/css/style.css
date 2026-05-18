@@ -744,6 +744,152 @@ body {
 /* ── Utilities ────────────────────────────────────────────── */
 .hidden { display: none !important; }
 
+/* ── Tags ─────────────────────────────────────────────────── */
+.tags-input-wrapper {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  transition: border-color 0.15s;
+  cursor: text;
+}
+
+.tags-input-wrapper:focus-within { border-color: var(--accent-dim); }
+
+.tags-input-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tags-input-wrapper input {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  outline: none;
+  flex: 1;
+  min-width: 100px;
+  padding: 2px 0;
+}
+
+.tags-input-wrapper input::placeholder { color: var(--text-dim); }
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.tag-pill-remove {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 1px;
+  line-height: 1;
+  transition: color 0.12s;
+}
+
+.tag-pill-remove:hover { color: var(--danger); }
+
+.note-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.note-tag {
+  display: inline-block;
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.note-tag:hover {
+  border-color: var(--accent-dim);
+  background: rgba(201, 169, 110, 0.1);
+}
+
+.tag-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tag-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(201, 169, 110, 0.12);
+  border: 1px solid var(--accent-dim);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  cursor: default;
+}
+
+.tag-filter-clear {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.12s;
+}
+
+.tag-filter-clear:hover { opacity: 1; }
+
+.tags-suggestions {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  margin-top: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.tags-suggestion-item {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.tags-suggestion-item:hover {
+  background: var(--surface3);
+  color: var(--accent);
+}
+
 /* ── Settings ──────────────────────────────────────────────── */
 .data-location-input {
   display: flex;

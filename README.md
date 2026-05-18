@@ -9,6 +9,7 @@ A desktop application for tracking meeting notes with individuals. Built with El
 - 📝 Track meeting notes for multiple people
 - 👥 Manage contacts with names, roles, and teams
 - 🔍 Search and filter through people
+- 🏷️ Tag notes with topics (e.g., "hiring", "architecture", "follow-up") and filter by tag
 - 💾 Local data storage - your data stays on your machine
 - ⚙️ Customizable data storage location
 - 🎨 Clean, minimalist interface
@@ -123,6 +124,9 @@ The application stores data in JSON files:
 #### Questions
 - `GET /api/questions` - Get all questions
 - `PUT /api/questions` - Update questions
+
+#### Tags
+- `GET /api/tags` - Get all unique tags used across all notes
 
 #### Settings
 - `GET /api/settings` - Get current settings
