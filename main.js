@@ -51,6 +51,78 @@ function safeLoadJSON(filePath, defaultValue = null) {
   return defaultValue;
 }
 
+function sanitizeString(str, maxLength = 1000) {
+  if (!str || typeof str !== 'string') return '';
+  return str.trim().substring(0, maxLength);
+}
+
+function validatePersonData(data) {
+  const errors = [];
+  
+  if (!data.name || typeof data.name !== 'string' || !data.name.trim()) {
+    errors.push('Name is required');
+  }
+  
+  if (data.name && data.name.length > 200) {
+    errors.push('Name must be 200 characters or less');
+  }
+  
+  if (data.role && (typeof data.role !== 'string' || data.role.length > 200)) {
+    errors.push('Role must be 200 characters or less');
+  }
+  
+  if (data.team && (typeof data.team !== 'string' || data.team.length > 200)) {
+    errors.push('Team must be 200 characters or less');
+  }
+  
+  return errors;
+}
+
+function validateNoteData(data) {
+  const errors = [];
+  
+  if (!data.content || typeof data.content !== 'string' || !data.content.trim()) {
+    errors.push('Content is required');
+  }
+  
+  if (data.content && data.content.length > 50000) {
+    errors.push('Content must be 50,000 characters or less');
+  }
+  
+  if (data.title && (typeof data.title !== 'string' || data.title.length > 500)) {
+    errors.push('Title must be 500 characters or less');
+  }
+  
+  return errors;
+}
+
+function validateQuestionsData(questions) {
+  const errors = [];
+  
+  if (!Array.isArray(questions)) {
+    errors.push('Questions must be an array');
+    return errors;
+  }
+  
+  if (questions.length === 0) {
+    errors.push('At least one question is required');
+  }
+  
+  if (questions.length > 500) {
+    errors.push('Too many questions (max 500)');
+  }
+  
+  const invalidQuestions = questions.filter(q => 
+    typeof q !== 'string' || q.length > 1000
+  );
+  
+  if (invalidQuestions.length > 0) {
+    errors.push('Each question must be a string of 1,000 characters or less');
+  }
+  
+  return errors;
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -168,18 +240,17 @@ function startServer() {
 
   // POST add person
   expressApp.post('/api/people', (req, res) => {
-    const { name, role, team } = req.body;
-    if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
-    if (!validateInput(name, 200) || !validateInput(role, 200) || !validateInput(team, 200)) {
-      return res.status(400).json({ error: 'Invalid input length' });
+    const validationErrors = validatePersonData(req.body);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: validationErrors.join(', ') });
     }
 
     const people = loadPeople();
     const person = {
       id: generateId(),
-      name: name.trim(),
-      role: (role || '').trim(),
-      team: (team || '').trim(),
+      name: sanitizeString(req.body.name, 200),
+      role: sanitizeString(req.body.role || '', 200),
+      team: sanitizeString(req.body.team || '', 200),
       createdAt: new Date().toISOString()
     };
     people.push(person);
@@ -195,13 +266,17 @@ function startServer() {
     const idx = people.findIndex(p => p.id === req.params.id);
     if (idx === -1) return res.status(404).json({ error: 'Person not found' });
 
-    const { name, role, team } = req.body;
-    if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
-    if (!validateInput(name, 200) || !validateInput(role, 200) || !validateInput(team, 200)) {
-      return res.status(400).json({ error: 'Invalid input length' });
+    const validationErrors = validatePersonData(req.body);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: validationErrors.join(', ') });
     }
 
-    people[idx] = { ...people[idx], name: name.trim(), role: (role || '').trim(), team: (team || '').trim() };
+    people[idx] = {
+      ...people[idx],
+      name: sanitizeString(req.body.name, 200),
+      role: sanitizeString(req.body.role || '', 200),
+      team: sanitizeString(req.body.team || '', 200)
+    };
     savePeople(people);
     res.json(people[idx]);
   });
@@ -246,17 +321,16 @@ function startServer() {
     const people = loadPeople();
     if (!people.find(p => p.id === req.params.id)) return res.status(404).json({ error: 'Person not found' });
 
-    const { content, title } = req.body;
-    if (!content || !content.trim()) return res.status(400).json({ error: 'Content is required' });
-    if (!validateInput(content, 50000) || !validateInput(title, 500)) {
-      return res.status(400).json({ error: 'Input too long' });
+    const validationErrors = validateNoteData(req.body);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: validationErrors.join(', ') });
     }
 
     const notes = loadNotes(req.params.id);
     const note = {
       id: generateId(),
-      title: (title || '').trim(),
-      content: content.trim(),
+      title: sanitizeString(req.body.title || '', 500),
+      content: sanitizeString(req.body.content, 50000),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -275,13 +349,17 @@ function startServer() {
     const idx = notes.findIndex(n => n.id === req.params.noteId);
     if (idx === -1) return res.status(404).json({ error: 'Note not found' });
 
-    const { content, title } = req.body;
-    if (!content || !content.trim()) return res.status(400).json({ error: 'Content is required' });
-    if (!validateInput(content, 50000) || !validateInput(title, 500)) {
-      return res.status(400).json({ error: 'Input too long' });
+    const validationErrors = validateNoteData(req.body);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: validationErrors.join(', ') });
     }
 
-    notes[idx] = { ...notes[idx], title: (title || '').trim(), content: content.trim(), updatedAt: new Date().toISOString() };
+    notes[idx] = {
+      ...notes[idx],
+      title: sanitizeString(req.body.title || '', 500),
+      content: sanitizeString(req.body.content, 50000),
+      updatedAt: new Date().toISOString()
+    };
     saveNotes(req.params.id, notes);
     res.json(notes[idx]);
   });
@@ -310,16 +388,18 @@ function startServer() {
 
   // PUT update all questions
   expressApp.put('/api/questions', (req, res) => {
-    const { questions } = req.body;
-    if (!Array.isArray(questions)) return res.status(400).json({ error: 'Questions must be an array' });
-    if (questions.length > 500) return res.status(400).json({ error: 'Too many questions' });
+    const validationErrors = validateQuestionsData(req.body.questions);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: validationErrors.join(', ') });
+    }
     
-    const cleaned = questions
-      .filter(q => validateInput(q, 1000))
-      .map(q => (q || '').trim())
+    const cleaned = req.body.questions
+      .map(q => sanitizeString(q, 1000))
       .filter(q => q.length > 0);
     
-    if (cleaned.length === 0) return res.status(400).json({ error: 'At least one question is required' });
+    if (cleaned.length === 0) {
+      return res.status(400).json({ error: 'At least one valid question is required' });
+    }
     
     saveQuestions(cleaned);
     res.json(cleaned);
