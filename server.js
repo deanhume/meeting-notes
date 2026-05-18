@@ -1,10 +1,11 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = 3000;
-const DATA_DIR = 'C:\\Users\\deanhume\\OneDrive - Microsoft\\Meeting-notes-tool\\data';
+const DATA_DIR = path.join(__dirname, 'data');
 const PEOPLE_FILE = path.join(DATA_DIR, 'people.json');
 const QUESTIONS_FILE = path.join(DATA_DIR, 'questions.json');
 
@@ -41,38 +42,80 @@ const defaultQuestions = [
 if (!fs.existsSync(QUESTIONS_FILE)) fs.writeFileSync(QUESTIONS_FILE, JSON.stringify(defaultQuestions, null, 2));
 
 // Helpers
+function atomicWriteFile(filePath, content) {
+  const tempFile = `${filePath}.${Date.now()}.tmp`;
+  try {
+    fs.writeFileSync(tempFile, content, 'utf8');
+    fs.renameSync(tempFile, filePath);
+  } catch (err) {
+    if (fs.existsSync(tempFile)) {
+      try { fs.unlinkSync(tempFile); } catch (e) {}
+    }
+    throw err;
+  }
+}
+
+function validateId(id) {
+  if (!id || typeof id !== 'string') return false;
+  return /^[a-z0-9]{8,20}$/.test(id);
+}
+
+function safeLoadJSON(filePath, defaultValue = null) {
+  try {
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      return JSON.parse(content);
+    }
+  } catch (err) {
+    console.error(`Error loading ${filePath}:`, err.message);
+  }
+  return defaultValue;
+}
+
+function validateInput(value, maxLength = 10000) {
+  if (typeof value !== 'string') return false;
+  if (value.length > maxLength) return false;
+  return true;
+}
+
 function loadPeople() {
-  return JSON.parse(fs.readFileSync(PEOPLE_FILE, 'utf8'));
+  return safeLoadJSON(PEOPLE_FILE, []);
 }
 
 function savePeople(people) {
-  fs.writeFileSync(PEOPLE_FILE, JSON.stringify(people, null, 2));
+  atomicWriteFile(PEOPLE_FILE, JSON.stringify(people, null, 2));
 }
 
 function getNotesFile(personId) {
+  if (!validateId(personId)) {
+    throw new Error('Invalid person ID');
+  }
   return path.join(DATA_DIR, `notes_${personId}.json`);
 }
 
 function loadNotes(personId) {
+  if (!validateId(personId)) return [];
   const file = getNotesFile(personId);
-  if (!fs.existsSync(file)) return [];
-  return JSON.parse(fs.readFileSync(file, 'utf8'));
+  return safeLoadJSON(file, []);
 }
 
 function saveNotes(personId, notes) {
-  fs.writeFileSync(getNotesFile(personId), JSON.stringify(notes, null, 2));
+  if (!validateId(personId)) {
+    throw new Error('Invalid person ID');
+  }
+  atomicWriteFile(getNotesFile(personId), JSON.stringify(notes, null, 2));
 }
 
 function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+  return crypto.randomBytes(6).toString('hex');
 }
 
 function loadQuestions() {
-  return JSON.parse(fs.readFileSync(QUESTIONS_FILE, 'utf8'));
+  return safeLoadJSON(QUESTIONS_FILE, defaultQuestions);
 }
 
 function saveQuestions(questions) {
-  fs.writeFileSync(QUESTIONS_FILE, JSON.stringify(questions, null, 2));
+  atomicWriteFile(QUESTIONS_FILE, JSON.stringify(questions, null, 2));
 }
 
 // ── People API ──────────────────────────────────────────────
@@ -86,6 +129,9 @@ app.get('/api/people', (req, res) => {
 app.post('/api/people', (req, res) => {
   const { name, role, team } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
+  if (!validateInput(name, 200) || !validateInput(role, 200) || !validateInput(team, 200)) {
+    return res.status(400).json({ error: 'Invalid input length' });
+  }
 
   const people = loadPeople();
   const person = {
@@ -102,12 +148,17 @@ app.post('/api/people', (req, res) => {
 
 // PUT update person
 app.put('/api/people/:id', (req, res) => {
+  if (!validateId(req.params.id)) return res.status(400).json({ error: 'Invalid ID' });
+
   const people = loadPeople();
   const idx = people.findIndex(p => p.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Person not found' });
 
   const { name, role, team } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
+  if (!validateInput(name, 200) || !validateInput(role, 200) || !validateInput(team, 200)) {
+    return res.status(400).json({ error: 'Invalid input length' });
+  }
 
   people[idx] = { ...people[idx], name: name.trim(), role: (role || '').trim(), team: (team || '').trim() };
   savePeople(people);
@@ -116,6 +167,8 @@ app.put('/api/people/:id', (req, res) => {
 
 // DELETE person (and their notes)
 app.delete('/api/people/:id', (req, res) => {
+  if (!validateId(req.params.id)) return res.status(400).json({ error: 'Invalid ID' });
+
   const people = loadPeople();
   const idx = people.findIndex(p => p.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Person not found' });
@@ -123,8 +176,12 @@ app.delete('/api/people/:id', (req, res) => {
   people.splice(idx, 1);
   savePeople(people);
 
-  const notesFile = getNotesFile(req.params.id);
-  if (fs.existsSync(notesFile)) fs.unlinkSync(notesFile);
+  try {
+    const notesFile = getNotesFile(req.params.id);
+    if (fs.existsSync(notesFile)) fs.unlinkSync(notesFile);
+  } catch (err) {
+    console.error('Error deleting notes file:', err.message);
+  }
 
   res.json({ ok: true });
 });
@@ -133,6 +190,8 @@ app.delete('/api/people/:id', (req, res) => {
 
 // GET notes for a person
 app.get('/api/people/:id/notes', (req, res) => {
+  if (!validateId(req.params.id)) return res.status(400).json({ error: 'Invalid ID' });
+
   const people = loadPeople();
   if (!people.find(p => p.id === req.params.id)) return res.status(404).json({ error: 'Person not found' });
   const notes = loadNotes(req.params.id);
@@ -141,11 +200,16 @@ app.get('/api/people/:id/notes', (req, res) => {
 
 // POST add note
 app.post('/api/people/:id/notes', (req, res) => {
+  if (!validateId(req.params.id)) return res.status(400).json({ error: 'Invalid ID' });
+
   const people = loadPeople();
   if (!people.find(p => p.id === req.params.id)) return res.status(404).json({ error: 'Person not found' });
 
   const { content, title } = req.body;
   if (!content || !content.trim()) return res.status(400).json({ error: 'Content is required' });
+  if (!validateInput(content, 50000) || !validateInput(title, 500)) {
+    return res.status(400).json({ error: 'Input too long' });
+  }
 
   const notes = loadNotes(req.params.id);
   const note = {
@@ -162,12 +226,19 @@ app.post('/api/people/:id/notes', (req, res) => {
 
 // PUT update note
 app.put('/api/people/:id/notes/:noteId', (req, res) => {
+  if (!validateId(req.params.id) || !validateId(req.params.noteId)) {
+    return res.status(400).json({ error: 'Invalid ID' });
+  }
+
   const notes = loadNotes(req.params.id);
   const idx = notes.findIndex(n => n.id === req.params.noteId);
   if (idx === -1) return res.status(404).json({ error: 'Note not found' });
 
   const { content, title } = req.body;
   if (!content || !content.trim()) return res.status(400).json({ error: 'Content is required' });
+  if (!validateInput(content, 50000) || !validateInput(title, 500)) {
+    return res.status(400).json({ error: 'Input too long' });
+  }
 
   notes[idx] = { ...notes[idx], title: (title || '').trim(), content: content.trim(), updatedAt: new Date().toISOString() };
   saveNotes(req.params.id, notes);
@@ -176,6 +247,10 @@ app.put('/api/people/:id/notes/:noteId', (req, res) => {
 
 // DELETE note
 app.delete('/api/people/:id/notes/:noteId', (req, res) => {
+  if (!validateId(req.params.id) || !validateId(req.params.noteId)) {
+    return res.status(400).json({ error: 'Invalid ID' });
+  }
+
   const notes = loadNotes(req.params.id);
   const idx = notes.findIndex(n => n.id === req.params.noteId);
   if (idx === -1) return res.status(404).json({ error: 'Note not found' });
@@ -196,8 +271,13 @@ app.get('/api/questions', (req, res) => {
 app.put('/api/questions', (req, res) => {
   const { questions } = req.body;
   if (!Array.isArray(questions)) return res.status(400).json({ error: 'Questions must be an array' });
+  if (questions.length > 500) return res.status(400).json({ error: 'Too many questions' });
   
-  const cleaned = questions.map(q => (q || '').trim()).filter(q => q.length > 0);
+  const cleaned = questions
+    .filter(q => validateInput(q, 1000))
+    .map(q => (q || '').trim())
+    .filter(q => q.length > 0);
+  
   if (cleaned.length === 0) return res.status(400).json({ error: 'At least one question is required' });
   
   saveQuestions(cleaned);
