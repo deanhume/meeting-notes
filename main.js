@@ -33,6 +33,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    show: false, // Don't show until content is rendered (avoids blank flash)
+    backgroundColor: '#0f0f0f', // Match app background for instant visual
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -44,6 +46,11 @@ function createWindow() {
 
   Menu.setApplicationMenu(null);
 
+  // Show window only after the page has fully painted
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+  });
+
   mainWindow.loadURL(`http://localhost:${PORT}`);
 
   mainWindow.on('closed', function () {
@@ -51,29 +58,32 @@ function createWindow() {
   });
 }
 
-// Start the embedded Express server that serves the API and static files
+// Start the embedded Express server and return a promise that resolves when listening
 function startServer() {
-  const expressApp = express();
-  const settings = loadSettings();
+  return new Promise((resolve) => {
+    const expressApp = express();
+    const settings = loadSettings();
 
-  expressApp.use(express.json());
-  expressApp.use(express.static(path.join(__dirname, 'public')));
+    expressApp.use(express.json());
+    expressApp.use(express.static(path.join(__dirname, 'public')));
 
-  // Mount all API routes using the shared route factory
-  createApiRoutes(expressApp, {
-    dataDir: settings.dataLocation,
-    loadSettings,
-    saveSettings
-  });
+    // Mount all API routes using the shared route factory
+    createApiRoutes(expressApp, {
+      dataDir: settings.dataLocation,
+      loadSettings,
+      saveSettings
+    });
 
-  // Serve index.html for any unmatched routes (SPA fallback)
-  expressApp.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  });
+    // Serve index.html for any unmatched routes (SPA fallback)
+    expressApp.get('*', (req, res) => {
+      res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    });
 
-  server = expressApp.listen(PORT, () => {
-    console.log(`Meeting Notes server running at http://localhost:${PORT}`);
-    console.log(`Data stored in: ${settings.dataLocation}`);
+    server = expressApp.listen(PORT, () => {
+      console.log(`Meeting Notes server running at http://localhost:${PORT}`);
+      console.log(`Data stored in: ${settings.dataLocation}`);
+      resolve();
+    });
   });
 }
 
@@ -89,9 +99,9 @@ ipcMain.handle('select-folder', async () => {
   return null;
 });
 
-// Electron lifecycle: start server first, then open the window
-app.whenReady().then(() => {
-  startServer();
+// Electron lifecycle: wait for server to be ready before opening the window
+app.whenReady().then(async () => {
+  await startServer();
   createWindow();
 
   app.on('activate', function () {
