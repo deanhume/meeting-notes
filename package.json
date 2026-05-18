@@ -28,6 +28,7 @@
       "main.js",
       "preload.js",
       "server.js",
+      "shared.js",
       "public/**/*",
       "package.json"
     ]
