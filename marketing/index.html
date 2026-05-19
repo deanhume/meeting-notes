@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Meeting Notes — Your private 1:1 meeting tracker</title>
+  <title>Meeting Notes - Your private 1:1 meeting tracker</title>
   <meta name="description" content="A lightweight desktop app for tracking meeting notes with your team. Local-first, private, and beautifully simple.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◈</text></svg>">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -12,9 +12,9 @@
       theme: {
         extend: {
           colors: {
-            brand: '#8b6914',
-            'brand-light': '#a37d1c',
-            'brand-bg': '#faf6ee',
+            brand: '#2A7B9B',
+            'brand-light': '#57C785',
+            'brand-bg': '#e8f5f0',
             surface: {
               50: '#ffffff',
               100: '#fafafa',
@@ -36,35 +36,35 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     .gradient-text {
-      background: linear-gradient(135deg, #8b6914 0%, #c9a96e 50%, #8b6914 100%);
+      background: linear-gradient(135deg, #2A7B9B 0%, #57C785 50%, #EDDD53 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
     .glow {
-      box-shadow: 0 4px 40px rgba(139, 105, 20, 0.08);
+      box-shadow: 0 4px 40px rgba(42, 123, 155, 0.15);
     }
     .feature-card:hover {
-      border-color: rgba(139, 105, 20, 0.25);
+      border-color: rgba(42, 123, 155, 0.25);
       transform: translateY(-2px);
     }
     .hero-gradient {
-      background: radial-gradient(ellipse at 50% 0%, rgba(139, 105, 20, 0.04) 0%, transparent 60%);
+      background: linear-gradient(135deg, #2A7B9B 0%, #57C785 50%, #EDDD53 100%);
     }
   </style>
 </head>
 <body class="bg-white text-gray-900 font-sans antialiased">
 
   <!-- Nav -->
-  <nav class="fixed top-0 w-full z-50 border-b border-gray-100 bg-white/80 backdrop-blur-xl">
+  <nav class="fixed top-0 w-full z-50 border-b border-gray-100 bg-white/80 backdrop-blur-xl" style="background-color: white;">
     <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <span class="text-brand text-xl">◈</span>
+        <img src="../public/images/logo.png" alt="Meeting Notes Logo" class="w-8 h-8">
         <span class="font-serif font-semibold text-lg tracking-tight text-gray-900">Meeting Notes</span>
       </div>
       <div class="flex items-center gap-8">
-        <a href="#features" class="text-sm text-gray-500 hover:text-gray-900 transition-colors">Features</a>
-        <a href="#how-it-works" class="text-sm text-gray-500 hover:text-gray-900 transition-colors">How it works</a>
+        <a href="#features" class="text-sm hover:text-gray-900 transition-colors">Features</a>
+        <a href="#how-it-works" class="text-sm hover:text-gray-900 transition-colors">How it works</a>
         <a href="#download" class="text-sm font-medium bg-brand text-white px-4 py-2 rounded-md hover:bg-brand-light transition-colors">Download</a>
       </div>
     </div>
@@ -73,12 +73,12 @@
   <!-- Hero -->
   <section class="hero-gradient pt-40 pb-24 px-6">
     <div class="max-w-4xl mx-auto text-center">
-      <p class="text-brand font-mono text-sm tracking-widest uppercase mb-6">Local-first · Private · Open Source</p>
+      <p class="text-brand font-mono text-sm tracking-widest uppercase mb-6" style="color:white">Local-first · Private · Open Source</p>
       <h1 class="font-serif text-5xl md:text-7xl font-bold leading-[1.1] mb-8 text-gray-900">
-        Your <em class="gradient-text italic font-semibold">private</em> space for<br>
-        <em class="gradient-text italic font-semibold">meaningful</em> 1:1s
+        Your <em class="italic font-semibold" style="color: white;">private</em> space for<br>
+        <em class="italic font-semibold" style="color: white;">meaningful</em> 1:1s
       </h1>
-      <p class="text-gray-500 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-12">
+      <p class="text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-12">
         A lightweight desktop app for tracking meeting notes with your team.
         No cloud. No accounts. Just you and your notes, stored locally on your machine.
       </p>
@@ -86,15 +86,12 @@
         <a href="#download" class="bg-brand text-white font-semibold px-8 py-3.5 rounded-lg text-base hover:bg-brand-light transition-colors">
           Download for Windows
         </a>
-        <a href="https://github.com/deanhume/meeting-notes" class="border border-gray-200 text-gray-600 font-medium px-8 py-3.5 rounded-lg text-base hover:border-gray-300 hover:text-gray-900 transition-all">
-          View on GitHub
-        </a>
       </div>
     </div>
   </section>
 
   <!-- App Preview -->
-  <section class="px-6 pb-32">
+  <section class="px-6 pb-32" style="padding-top: 2rem;">
     <div class="max-w-5xl mx-auto">
       <div class="rounded-2xl border border-gray-200 bg-surface-100 glow overflow-hidden">
         <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100">
@@ -145,7 +142,7 @@
             <div class="space-y-4">
               <div class="border border-gray-100 rounded-lg p-4 bg-surface-100/50">
                 <div class="flex justify-between items-start mb-2">
-                  <div class="font-serif font-semibold text-sm text-gray-800">1:1 — Q2 Planning</div>
+                  <div class="font-serif font-semibold text-sm text-gray-800">1:1 - Q2 Planning</div>
                   <div class="text-[10px] text-gray-400 font-mono">2d ago</div>
                 </div>
                 <p class="text-xs text-gray-500 leading-relaxed">Discussed team capacity for Q2. Sarah raised concerns about the migration timeline. Agreed to extend by 2 weeks and bring in additional contractor support…</p>
@@ -205,7 +202,7 @@
         <div class="feature-card border border-gray-100 rounded-xl p-7 bg-surface-100/50 transition-all duration-200">
           <div class="text-2xl mb-4">⚡</div>
           <h3 class="font-serif font-semibold text-lg mb-2 text-gray-900">Instant &amp; Lightweight</h3>
-          <p class="text-gray-500 text-sm leading-relaxed">Launches in under a second. No Electron bloat — lean, fast, and focused on one thing: your meetings.</p>
+          <p class="text-gray-500 text-sm leading-relaxed">Launches in under a second. No Electron bloat - lean, fast, and focused on one thing: your meetings.</p>
         </div>
         <div class="feature-card border border-gray-100 rounded-xl p-7 bg-surface-100/50 transition-all duration-200">
           <div class="text-2xl mb-4">📂</div>
@@ -230,7 +227,7 @@
           <div class="flex-shrink-0 w-12 h-12 rounded-full border border-brand/20 bg-brand-bg flex items-center justify-center font-mono text-brand font-bold">1</div>
           <div>
             <h3 class="font-serif font-semibold text-xl mb-2 text-gray-900">Add your people</h3>
-            <p class="text-gray-500 leading-relaxed">Add the people you meet with regularly — their name, role, and team. Build your sidebar in seconds.</p>
+            <p class="text-gray-500 leading-relaxed">Add the people you meet with regularly - their name, role, and team. Build your sidebar in seconds.</p>
           </div>
         </div>
         <div class="flex items-start gap-8">
@@ -251,50 +248,22 @@
     </div>
   </section>
 
-  <!-- Tech Stack -->
-  <section class="px-6 pb-32">
-    <div class="max-w-4xl mx-auto text-center">
-      <p class="text-brand font-mono text-sm tracking-widest uppercase mb-4">Built with</p>
-      <div class="flex flex-wrap items-center justify-center gap-8 text-gray-400">
-        <div class="flex items-center gap-2">
-          <span class="text-lg">⚛️</span>
-          <span class="font-mono text-sm">Electron</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-lg">🚂</span>
-          <span class="font-mono text-sm">Express.js</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-lg">📄</span>
-          <span class="font-mono text-sm">Vanilla JS</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-lg">💾</span>
-          <span class="font-mono text-sm">JSON Storage</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- CTA / Download -->
   <section id="download" class="px-6 pb-32">
     <div class="max-w-3xl mx-auto text-center">
-      <div class="rounded-2xl border border-gray-100 bg-surface-100 p-12 md:p-16 glow">
-        <h2 class="font-serif text-3xl md:text-4xl font-bold mb-4 text-gray-900">
-          Ready to take <em class="italic gradient-text">better</em> notes?
+      <div class="rounded-2xl border border-transparent bg-gradient-to-br from-[#2A7B9B] via-[#57C785] to-[#EDDD53] p-12 md:p-16 glow">
+        <h2 class="font-serif text-3xl md:text-4xl font-bold mb-4 text-white">
+          Ready to take <em class="italic text-white">better</em> notes?
         </h2>
-        <p class="text-gray-500 mb-8 max-w-md mx-auto">
+        <p class="text-white/90 mb-8 max-w-md mx-auto">
           Download Meeting Notes and start your first 1:1 in under a minute. Free, open source, and forever private.
         </p>
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <a href="https://github.com/deanhume/meeting-notes/releases" class="bg-brand text-white font-semibold px-8 py-3.5 rounded-lg text-base hover:bg-brand-light transition-colors">
+          <a href="https://github.com/deanhume/meeting-notes/releases" class="bg-white text-[#2A7B9B] font-semibold px-8 py-3.5 rounded-lg text-base hover:bg-gray-100 transition-colors">
             Download for Windows
           </a>
-          <a href="https://github.com/deanhume/meeting-notes" class="border border-gray-200 text-gray-600 font-medium px-8 py-3.5 rounded-lg text-base hover:border-gray-300 hover:text-gray-900 transition-all">
-            Star on GitHub
-          </a>
         </div>
-        <p class="text-gray-400 text-xs mt-6 font-mono">v1.0.0 · Windows x64 · MIT License</p>
+        <p class="text-white/70 text-xs mt-6 font-mono">v1.0.0 · Windows x64 · MIT License</p>
       </div>
     </div>
   </section>
@@ -303,7 +272,7 @@
   <footer class="border-t border-gray-100 py-12 px-6">
     <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
       <div class="flex items-center gap-2">
-        <span class="text-brand">◈</span>
+        <img src="../public/images/logo.png" alt="Meeting Notes Logo" class="w-6 h-6">
         <span class="font-serif text-sm text-gray-500">Meeting Notes</span>
       </div>
       <p class="text-gray-400 text-xs font-mono">Built with ❤️ by Dean Hume · Open Source · MIT License</p>
