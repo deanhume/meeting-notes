@@ -11,6 +11,7 @@ let currentQuestion = '';
 let allTags = [];
 let currentTags = [];
 let filterTag = null;
+let isDarkTheme = true; // Default to dark theme
 
 /* ── API helpers ──────────────────────────────────────────── */
 async function api(method, path, body) {
@@ -51,6 +52,23 @@ function formatDateFull(iso) {
 
 function initials(name) {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+}
+
+/* ── Theme Toggle ─────────────────────────────────────────── */
+function toggleTheme() {
+  isDarkTheme = !isDarkTheme;
+  document.body.classList.toggle('light-theme', !isDarkTheme);
+  
+  // Save preference to localStorage
+  localStorage.setItem('theme', isDarkTheme ? 'dark' : 'light');
+}
+
+function loadThemePreference() {
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme === 'light') {
+    isDarkTheme = false;
+    document.body.classList.add('light-theme');
+  }
 }
 
 /* ── Render Sidebar ───────────────────────────────────────── */
@@ -604,6 +622,9 @@ function wireEvents() {
   // Settings button
   document.getElementById('settingsBtn').addEventListener('click', openSettings);
 
+  // Theme toggle button
+  document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
+
   // Person modal
   document.getElementById('personModalClose').addEventListener('click', closePersonModal);
   document.getElementById('personModalCancel').addEventListener('click', closePersonModal);
@@ -668,6 +689,7 @@ function wireEvents() {
 /* ── Init ─────────────────────────────────────────────────── */
 async function init() {
   try {
+    loadThemePreference(); // Load theme before rendering
     people = await api('GET', '/api/people');
     questions = await api('GET', '/api/questions');
     allTags = await api('GET', '/api/tags');

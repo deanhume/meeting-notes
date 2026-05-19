@@ -22,6 +22,23 @@
   --font-mono:  'IBM Plex Mono', monospace;
 }
 
+/* ── Light Theme ──────────────────────────────────────────── */
+body.light-theme {
+  --bg:         #ffffff;
+  --surface:    #fafafa;
+  --surface2:   #f5f5f4;
+  --surface3:   #eeeeee;
+  --border:     #e0e0e0;
+  --border2:    #d0d0d0;
+  --text:       #1a1a1a;
+  --text-dim:   #666666;
+  --text-mid:   #4a4a4a;
+  --accent:     #c9a96e;
+  --accent-dim: #7a6440;
+  --danger:     #c0504d;
+  --danger-dim: #5c2120;
+}
+
 html, body { height: 100%; }
 
 body {
@@ -62,7 +79,7 @@ body {
 .settings-btn {
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-dim);
   cursor: pointer;
   font-size: 18px;
   padding: 6px;
@@ -72,7 +89,7 @@ body {
 }
 
 .settings-btn:hover {
-  background: var(--hover);
+  background: var(--surface2);
   color: var(--text);
 }
 
@@ -232,6 +249,63 @@ body {
   border-color: var(--accent-dim);
   color: var(--accent);
   background: rgba(201, 169, 110, 0.04);
+}
+
+/* ── Theme Toggle ─────────────────────────────────────────── */
+.theme-toggle-wrapper {
+  padding: 16px 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+}
+
+.theme-toggle-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.theme-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.theme-toggle-track {
+  display: block;
+  width: 40px;
+  height: 20px;
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.theme-toggle-thumb {
+  display: block;
+  width: 14px;
+  height: 14px;
+  background: var(--text-mid);
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+body.light-theme .theme-toggle-track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+body.light-theme .theme-toggle-thumb {
+  background: white;
+  transform: translateX(20px);
 }
 
 /* ── Main ─────────────────────────────────────────────────── */
