@@ -12,9 +12,11 @@ A desktop application for tracking meeting notes with individuals. Built with El
 - 🏷️ Tag notes with topics (e.g., "hiring", "architecture", "follow-up") and filter by tag
 - 💾 Local data storage - your data stays on your machine
 - ⚙️ Customizable data storage location
-- 🎨 Clean, minimalist interface
+- 🎨 Clean, minimalist interface with light/dark theme toggle
 - 📋 Pre-configured discussion questions for meetings
 - ✏️ Rich text editing for notes
+- 🌐 Works completely offline with embedded fonts
+- 📄 Marketing landing page included
 
 ## Tech Stack
 
@@ -72,16 +74,24 @@ meeting-notes/
 ├── main.js              # Electron main process
 ├── preload.js           # Electron preload script (IPC bridge)
 ├── server.js            # Express server (web mode only)
+├── shared.js            # Shared validation, helpers, and API routes
 ├── package.json         # Project dependencies and scripts
 ├── public/
 │   ├── index.html       # Main HTML file
 │   ├── css/
-│   │   └── style.css    # Application styles
+│   │   ├── style.css    # Application styles
+│   │   └── fonts.css    # Font definitions
 │   ├── js/
 │   │   └── app.js       # Frontend JavaScript
+│   ├── fonts/           # Embedded fonts for offline use
+│   │   ├── ibm-plex-sans-*.ttf
+│   │   ├── ibm-plex-mono-*.ttf
+│   │   └── playfair-display-*.ttf
 │   └── images/
 │       ├── logo.png     # Original logo (240x240)
 │       └── logo-256.png # Resized logo for installer (256x256)
+├── marketing/
+│   └── index.html       # Marketing landing page
 └── dist/                # Build output (generated)
 ```
 
@@ -90,8 +100,9 @@ meeting-notes/
 - **main.js**: Electron main process that creates the window and manages the Express server
 - **preload.js**: Secure bridge between Electron and the renderer process (for folder picker)
 - **server.js**: Standalone Express server for web mode
-- **public/js/app.js**: All frontend logic including API calls and UI interactions
-- **public/css/style.css**: Complete styling for the application
+- **shared.js**: Shared module containing validation, helpers, and API route factory used by both Electron and web server
+- **public/js/app.js**: All frontend logic including API calls, UI interactions, and theme management
+- **public/css/style.css**: Complete styling for the application including light/dark theme support
 
 ### Data Storage
 
@@ -201,6 +212,10 @@ You can customize where your data is stored:
 
 The app will restart and use the new location for all data files.
 
+### Theme
+
+Toggle between light and dark themes using the theme toggle button at the bottom of the sidebar. Your preference is automatically saved.
+
 ## Keyboard Shortcuts
 
 - `Escape` - Close any open modal
@@ -233,12 +248,16 @@ Dean Hume
 
 ## Version History
 
-### 1.0.0 (2026-05-14)
+### 1.0.0 (2026-05-19)
 - Initial release
-- Core features: people management, note taking, questions
+- Core features: people management, note taking, questions, tagging
 - Settings for customizable data location
 - Windows installer with custom branding
-- Clean, minimalist UI
+- Clean, minimalist UI with light/dark theme toggle
+- Completely offline with embedded fonts
+- Marketing landing page
+- Enhanced security with input validation and atomic file writes
+- Refactored architecture with shared module for code reuse
 
 ## Support
 
