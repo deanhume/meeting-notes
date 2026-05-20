@@ -12,6 +12,8 @@ let allTags = [];
 let currentTags = [];
 let filterTag = null;
 let isDarkTheme = true; // Default to dark theme
+let autosaveKeystrokeCount = 0;
+let autosaveTimer = null;
 
 /* ── API helpers ──────────────────────────────────────────── */
 async function api(method, path, body) {
@@ -414,9 +416,68 @@ function refreshQuestion() {
   document.getElementById('questionText').textContent = currentQuestion;
 }
 
+function showAutosaveIndicator() {
+  const indicator = document.getElementById('autosaveIndicator');
+  indicator.classList.remove('hidden');
+  
+  // Clear existing timer
+  if (autosaveTimer) clearTimeout(autosaveTimer);
+  
+  // Hide after 3 seconds
+  autosaveTimer = setTimeout(() => {
+    indicator.classList.add('hidden');
+  }, 3000);
+}
+
+async function autosaveNote() {
+  if (!editingNoteId || !currentPersonId) return;
+  
+  const title = document.getElementById('noteTitleInput').value.trim();
+  const content = document.getElementById('noteContentInput').value.trim();
+  const tags = [...currentTags];
+
+  if (!content) return;
+
+  try {
+    const updated = await api('PUT', `/api/people/${currentPersonId}/notes/${editingNoteId}`, { title, content, tags });
+    const idx = currentNotes.findIndex(n => n.id === editingNoteId);
+    if (idx !== -1) currentNotes[idx] = updated;
+    
+    // Update allTags with any new tags
+    tags.forEach(t => { if (!allTags.includes(t)) allTags.push(t); });
+    allTags.sort();
+    
+    showAutosaveIndicator();
+  } catch (e) {
+    console.error('Autosave failed:', e.message);
+  }
+}
+
+function setupAutosave() {
+  const textarea = document.getElementById('noteContentInput');
+  
+  textarea.addEventListener('input', () => {
+    if (!editingNoteId) return; // Only autosave when editing existing notes
+    
+    autosaveKeystrokeCount++;
+    
+    if (autosaveKeystrokeCount >= 20) {
+      autosaveKeystrokeCount = 0;
+      autosaveNote();
+    }
+  });
+}
+
+function resetAutosave() {
+  autosaveKeystrokeCount = 0;
+  if (autosaveTimer) clearTimeout(autosaveTimer);
+  document.getElementById('autosaveIndicator').classList.add('hidden');
+}
+
 function openNewNote() {
   editingNoteId = null;
   currentTags = [];
+  resetAutosave();
   document.getElementById('noteModalTitle').textContent = 'New meeting note';
   document.getElementById('noteTitleInput').value = '';
   document.getElementById('noteContentInput').value = '';
@@ -432,6 +493,7 @@ function openEditNote(noteId) {
   if (!note) return;
   editingNoteId = noteId;
   currentTags = [...(note.tags || [])];
+  resetAutosave();
   document.getElementById('noteModalTitle').textContent = 'Edit note';
   document.getElementById('noteTitleInput').value = note.title || '';
   document.getElementById('noteContentInput').value = note.content;
@@ -442,6 +504,7 @@ function openEditNote(noteId) {
 }
 
 function closeNoteModal() {
+  resetAutosave();
   document.getElementById('noteModal').classList.add('hidden');
 }
 
@@ -696,6 +759,7 @@ async function init() {
     renderPeopleList();
     wireEvents();
     wireTagsInput();
+    setupAutosave();
     await loadNoteCounts();
   } catch (e) {
     document.body.innerHTML = `<div style="padding:40px;font-family:monospace;color:#c0504d;">Failed to connect to server: ${e.message}</div>`;

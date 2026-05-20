@@ -748,6 +748,20 @@ body.light-theme .theme-toggle-thumb {
   margin-bottom: 12px;
 }
 
+.autosave-indicator {
+  font-size: 11px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  margin-bottom: 4px;
+  margin-top: -2px;
+  opacity: 0.85;
+  animation: fadeIn 0.3s ease;
+}
+
+.autosave-indicator.hidden {
+  display: none;
+}
+
 /* ── Question Prompt ──────────────────────────────────────── */
 .question-prompt {
   background: var(--surface2);

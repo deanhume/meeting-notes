@@ -15,6 +15,7 @@ A desktop application for tracking meeting notes with individuals. Built with El
 - 🎨 Clean, minimalist interface with light/dark theme toggle
 - 📋 Pre-configured discussion questions for meetings
 - ✏️ Rich text editing for notes
+- 💾 Autosave functionality - notes automatically save every 20 keystrokes when editing
 - 🌐 Works completely offline with embedded fonts
 - 📄 Marketing landing page included
 
@@ -247,6 +248,11 @@ MIT License - feel free to use this project for personal or commercial purposes.
 Dean Hume
 
 ## Version History
+
+### 1.1.0 (2026-05-20)
+- Added autosave functionality - notes automatically save every 20 keystrokes when editing
+- Visual autosave indicator displays "Autosaved recently" above textarea
+- Autosave indicator auto-hides after 3 seconds
 
 ### 1.0.0 (2026-05-19)
 - Initial release

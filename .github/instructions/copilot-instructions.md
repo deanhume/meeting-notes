@@ -113,6 +113,7 @@ meeting-notes/
 10. **Atomic file writes**: Use temp file + rename to prevent data corruption
 11. **Settings management**: Configurable data location via Electron userData
 12. **Offline fonts**: Self-hosted fonts for complete offline functionality
+13. **Autosave**: Notes automatically save every 20 keystrokes when editing; visual indicator appears and auto-hides after 3 seconds
 
 ## Guidelines for Copilot
 
