@@ -761,8 +761,18 @@ async function init() {
     wireTagsInput();
     setupAutosave();
     await loadNoteCounts();
+    await loadVersion();
   } catch (e) {
     document.body.innerHTML = `<div style="padding:40px;font-family:monospace;color:#c0504d;">Failed to connect to server: ${e.message}</div>`;
+  }
+}
+
+async function loadVersion() {
+  try {
+    const data = await api('GET', '/api/version');
+    document.getElementById('versionDisplay').textContent = `v${data.version}`;
+  } catch (e) {
+    console.warn('Failed to load version:', e);
   }
 }
 

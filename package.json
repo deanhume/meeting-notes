@@ -8,8 +8,8 @@
     "start": "electron .",
     "dev": "electron .",
     "web": "node server.js",
-    "build": "electron-builder --win --x64 && npm version patch --no-git-tag-version",
-    "build:dir": "electron-builder --win --x64 --dir && npm version patch --no-git-tag-version"
+    "build": "npm version patch --no-git-tag-version && electron-builder --win --x64  ",
+    "build:dir": "npm version patch --no-git-tag-version && electron-builder --win --x64 --dir"
   },
   "build": {
     "appId": "com.deanhume.meetingnotes",

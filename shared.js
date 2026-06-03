@@ -226,6 +226,14 @@ function createApiRoutes(expressApp, options) {
     atomicWriteFile(QUESTIONS_FILE, JSON.stringify(questions, null, 2));
   }
 
+  // ── Version API ─────────────────────────────────────────────
+
+  // GET app version
+  expressApp.get('/api/version', (req, res) => {
+    const packageJson = safeLoadJSON(path.join(__dirname, 'package.json'), { version: '1.0.0' });
+    res.json({ version: packageJson.version });
+  });
+
   // ── People API ──────────────────────────────────────────────
 
   // GET all people
