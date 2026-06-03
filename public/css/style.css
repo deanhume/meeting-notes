@@ -829,6 +829,10 @@ body.light-theme .theme-toggle-thumb {
   opacity: 1;
 }
 
+body.light-theme .icon-refresh {
+  content: url('/images/refresh-dark.png');
+}
+
 /* ── Utilities ────────────────────────────────────────────── */
 .hidden { display: none !important; }
 
