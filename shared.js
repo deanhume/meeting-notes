@@ -427,6 +427,38 @@ function createApiRoutes(expressApp, options) {
     res.json([...tagSet].sort());
   });
 
+  // ── Dashboard API ───────────────────────────────────────────
+
+  // GET recent notes from last 2 weeks across all people
+  expressApp.get('/api/dashboard', (req, res) => {
+    const people = loadPeople();
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    
+    const recentNotes = [];
+    
+    people.forEach(person => {
+      const notes = loadNotes(person.id);
+      notes.forEach(note => {
+        const noteDate = new Date(note.createdAt);
+        if (noteDate >= twoWeeksAgo) {
+          recentNotes.push({
+            ...note,
+            personId: person.id,
+            personName: person.name,
+            personRole: person.role,
+            personTeam: person.team
+          });
+        }
+      });
+    });
+    
+    // Sort by date, newest first
+    recentNotes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    res.json(recentNotes);
+  });
+
   // ── Settings API ───────────────────────────────────────────
 
   // GET settings (only available if loadSettings is provided)

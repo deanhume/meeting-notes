@@ -36,6 +36,10 @@
         <span>+</span> Add person
       </button>
 
+      <button class="dashboard-btn" id="dashboardBtn">
+        📊 Dashboard
+      </button>
+
       <div class="theme-toggle-wrapper">
         <span class="theme-toggle-label">Theme</span>
         <button class="theme-toggle" id="themeToggleBtn" title="Toggle light/dark mode">
@@ -56,6 +60,16 @@
           <h1>Your meeting notes</h1>
           <p>Select a person from the sidebar to view or add notes,<br>or add someone new to get started.</p>
         </div>
+      </div>
+
+      <!-- Dashboard view -->
+      <div class="dashboard-view hidden" id="dashboardView">
+        <div class="dashboard-header">
+          <h2>📊 2-Week Dashboard</h2>
+          <div class="dashboard-period" id="dashboardPeriod"></div>
+        </div>
+        <div class="dashboard-summary" id="dashboardSummary"></div>
+        <div class="dashboard-notes" id="dashboardNotes"></div>
       </div>
 
       <!-- Person view -->

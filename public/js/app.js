@@ -73,6 +73,104 @@ function loadThemePreference() {
   }
 }
 
+/* ── Dashboard ────────────────────────────────────────────── */
+async function showDashboard() {
+  currentPersonId = null;
+  
+  // Update sidebar active state
+  document.querySelectorAll('.person-item').forEach(el => {
+    el.classList.remove('active');
+  });
+
+  // Hide other views
+  document.getElementById('welcomeScreen').classList.add('hidden');
+  document.getElementById('personView').classList.add('hidden');
+  
+  // Show dashboard view
+  const view = document.getElementById('dashboardView');
+  view.classList.remove('hidden');
+
+  try {
+    const recentNotes = await api('GET', '/api/dashboard');
+    renderDashboard(recentNotes);
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+function renderDashboard(recentNotes) {
+  const twoWeeksAgo = new Date();
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+  
+  const periodText = `${twoWeeksAgo.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} — ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  document.getElementById('dashboardPeriod').textContent = periodText;
+
+  // Generate summary statistics
+  const peopleWithNotes = new Set(recentNotes.map(n => n.personId)).size;
+  const totalMeetings = recentNotes.length;
+  const allTags = recentNotes.flatMap(n => n.tags || []);
+  const tagCounts = {};
+  allTags.forEach(tag => {
+    tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+  });
+  const topTags = Object.entries(tagCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([tag]) => tag);
+
+  const summaryHtml = `
+    <div class="dashboard-stats">
+      <div class="dashboard-stat">
+        <div class="dashboard-stat-value">${totalMeetings}</div>
+        <div class="dashboard-stat-label">Total meetings</div>
+      </div>
+      <div class="dashboard-stat">
+        <div class="dashboard-stat-value">${peopleWithNotes}</div>
+        <div class="dashboard-stat-label">People met with</div>
+      </div>
+      ${topTags.length > 0 ? `
+        <div class="dashboard-stat">
+          <div class="dashboard-stat-label">Top tags</div>
+          <div class="dashboard-tags">${topTags.map(t => `<span class="dashboard-tag">${escHtml(t)}</span>`).join('')}</div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+  document.getElementById('dashboardSummary').innerHTML = summaryHtml;
+
+  // Render notes
+  const notesContainer = document.getElementById('dashboardNotes');
+  
+  if (recentNotes.length === 0) {
+    notesContainer.innerHTML = '<div class="dashboard-empty">No meetings in the last 2 weeks.</div>';
+    return;
+  }
+
+  notesContainer.innerHTML = recentNotes.map(note => {
+    const tagsHtml = (note.tags && note.tags.length > 0)
+      ? `<div class="note-tags">${note.tags.map(t => `<span class="note-tag">${escHtml(t)}</span>`).join('')}</div>`
+      : '';
+    
+    return `
+      <div class="dashboard-note-card">
+        <div class="dashboard-note-header">
+          <div class="dashboard-note-person">
+            <div class="dashboard-note-avatar">${initials(note.personName)}</div>
+            <div>
+              <div class="dashboard-note-person-name">${escHtml(note.personName)}</div>
+              ${note.personRole || note.personTeam ? `<div class="dashboard-note-person-meta">${[note.personRole, note.personTeam].filter(Boolean).join(' · ')}</div>` : ''}
+            </div>
+          </div>
+          <div class="dashboard-note-date">${formatDate(note.createdAt)}</div>
+        </div>
+        ${note.title ? `<div class="dashboard-note-title">${escHtml(note.title)}</div>` : ''}
+        <div class="dashboard-note-content">${escHtml(note.content)}</div>
+        ${tagsHtml}
+      </div>
+    `;
+  }).join('');
+}
+
 /* ── Render Sidebar ───────────────────────────────────────── */
 function renderPeopleList(filter = '') {
   const list = document.getElementById('peopleList');
@@ -115,8 +213,11 @@ async function selectPerson(id) {
     el.classList.toggle('active', el.dataset.id === id);
   });
 
-  // Show person view
+  // Hide other views
   document.getElementById('welcomeScreen').classList.add('hidden');
+  document.getElementById('dashboardView').classList.add('hidden');
+  
+  // Show person view
   const view = document.getElementById('personView');
   view.classList.remove('hidden');
 
@@ -503,6 +604,24 @@ function openEditNote(noteId) {
   document.getElementById('noteTitleInput').focus();
 }
 
+async function saveOnModalClose() {
+  const content = document.getElementById('noteContentInput').value.trim();
+  if (!content) {
+    closeNoteModal();
+    return;
+  }
+  
+  if (editingNoteId) {
+    await autosaveNote();
+    renderNotes();
+  } else {
+    await saveNoteModal();
+    return;
+  }
+  
+  closeNoteModal();
+}
+
 function closeNoteModal() {
   resetAutosave();
   document.getElementById('noteModal').classList.add('hidden');
@@ -665,6 +784,9 @@ function wireEvents() {
   // Add person button
   document.getElementById('addPersonBtn').addEventListener('click', openAddPerson);
 
+  // Dashboard button
+  document.getElementById('dashboardBtn').addEventListener('click', showDashboard);
+
   // Edit / delete current person
   document.getElementById('editPersonBtn').addEventListener('click', () => {
     if (currentPersonId) openEditPerson(currentPersonId);
@@ -697,11 +819,13 @@ function wireEvents() {
   });
 
   // Note modal
-  document.getElementById('noteModalClose').addEventListener('click', closeNoteModal);
-  document.getElementById('noteModalCancel').addEventListener('click', closeNoteModal);
+  document.getElementById('noteModalClose').addEventListener('click', saveOnModalClose);
+  document.getElementById('noteModalCancel').addEventListener('click', saveOnModalClose);
   document.getElementById('noteModalSave').addEventListener('click', saveNoteModal);
-  document.getElementById('noteModal').addEventListener('click', e => {
-    if (e.target === document.getElementById('noteModal')) closeNoteModal();
+  document.getElementById('noteModal').addEventListener('click', async e => {
+    if (e.target === document.getElementById('noteModal')) {
+      await saveOnModalClose();
+    }
   });
 
   // Confirm modal
@@ -732,12 +856,12 @@ function wireEvents() {
   });
 
   // Keyboard shortcuts
-  document.addEventListener('keydown', e => {
+  document.addEventListener('keydown', async e => {
     if (e.key === 'Escape') {
       if (!document.getElementById('confirmModal').classList.contains('hidden'))  closeConfirm();
       else if (!document.getElementById('settingsModal').classList.contains('hidden')) closeSettingsModal();
       else if (!document.getElementById('questionsModal').classList.contains('hidden')) closeQuestionsModal();
-      else if (!document.getElementById('noteModal').classList.contains('hidden')) closeNoteModal();
+      else if (!document.getElementById('noteModal').classList.contains('hidden')) await saveOnModalClose();
       else if (!document.getElementById('personModal').classList.contains('hidden')) closePersonModal();
     }
     // Ctrl/Cmd+Enter to save in modals

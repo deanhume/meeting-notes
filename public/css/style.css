@@ -1008,3 +1008,217 @@ body.light-theme .icon-refresh {
   font-family: var(--font-mono);
   margin: 0;
 }
+
+/* ── Dashboard Button ─────────────────────────────────────── */
+.dashboard-btn {
+  margin: 6px 14px 10px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  color: var(--bg);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dashboard-btn:hover {
+  background: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* ── Dashboard View ───────────────────────────────────────── */
+.dashboard-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.dashboard-header {
+  padding: 28px 32px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-header h2 {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 8px 0;
+}
+
+.dashboard-period {
+  font-size: 14px;
+  color: var(--text-mid);
+  font-family: var(--font-mono);
+}
+
+.dashboard-summary {
+  padding: 24px 32px;
+  background: var(--surface1);
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-stats {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.dashboard-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dashboard-stat-value {
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--accent);
+  font-family: var(--font-serif);
+  line-height: 1;
+}
+
+.dashboard-stat-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: var(--font-mono);
+}
+
+.dashboard-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.dashboard-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--text-mid);
+  font-family: var(--font-mono);
+}
+
+.dashboard-notes {
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dashboard-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-dim);
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+
+.dashboard-note-card {
+  background: var(--surface1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  transition: all 0.15s;
+}
+
+.dashboard-note-card:hover {
+  border-color: var(--border2);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.dashboard-note-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.dashboard-note-person {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.dashboard-note-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  flex-shrink: 0;
+}
+
+.dashboard-note-person-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.dashboard-note-person-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+.dashboard-note-date {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.dashboard-note-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  font-family: var(--font-sans);
+  margin-bottom: 10px;
+}
+
+.dashboard-note-content {
+  font-size: 13px;
+  color: var(--text-mid);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  max-height: 150px;
+  overflow: hidden;
+  position: relative;
+}
+
+.dashboard-note-content::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background: linear-gradient(transparent, var(--surface1));
+}
+
+body.light-theme .dashboard-note-content::after {
+  background: linear-gradient(transparent, var(--surface1));
+}
