@@ -503,7 +503,6 @@ body.light-theme .theme-toggle-thumb {
   color: var(--text-mid);
   font-size: 13.5px;
   line-height: 1.75;
-  white-space: pre-wrap;
   word-break: break-word;
 }
 
@@ -512,6 +511,193 @@ body.light-theme .theme-toggle-thumb {
   -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* ── Markdown Rendered Content ────────────────────────────── */
+.note-content h1, .note-content h2, .note-content h3,
+.note-content h4, .note-content h5, .note-content h6,
+.markdown-body h1, .markdown-body h2, .markdown-body h3,
+.markdown-body h4, .markdown-body h5, .markdown-body h6 {
+  color: var(--text);
+  margin: 0.6em 0 0.3em;
+  line-height: 1.3;
+}
+.note-content h1, .markdown-body h1 { font-size: 1.4em; }
+.note-content h2, .markdown-body h2 { font-size: 1.25em; }
+.note-content h3, .markdown-body h3 { font-size: 1.1em; }
+.note-content h4, .markdown-body h4 { font-size: 1em; }
+
+.note-content p, .markdown-body p {
+  margin: 0.4em 0;
+}
+
+.note-content ul, .note-content ol,
+.markdown-body ul, .markdown-body ol {
+  padding-left: 1.5em;
+  margin: 0.4em 0;
+}
+
+.note-content li, .markdown-body li {
+  margin: 0.2em 0;
+}
+
+.note-content pre, .markdown-body pre {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.note-content code, .markdown-body code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.note-content pre code, .markdown-body pre code {
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.note-content blockquote, .markdown-body blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+  margin: 0.5em 0;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.note-content hr, .markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.8em 0;
+}
+
+.note-content a, .markdown-body a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.note-content a:hover, .markdown-body a:hover {
+  opacity: 0.8;
+}
+
+.note-content strong, .markdown-body strong {
+  color: var(--text);
+}
+
+.note-content del, .markdown-body del {
+  opacity: 0.6;
+}
+
+.note-content input[type="checkbox"], .markdown-body input[type="checkbox"] {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* ── Note Editor Tabs ─────────────────────────────────────── */
+.note-editor-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+
+.note-tab {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  padding: 5px 12px;
+  cursor: pointer;
+  border-radius: var(--radius) var(--radius) 0 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.note-tab:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.note-tab.active {
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: -7px;
+}
+
+.note-editor-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+.note-preview-pane {
+  min-height: 250px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* ── Markdown Toolbar ─────────────────────────────────────── */
+.md-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.md-toolbar-btn {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text-mid);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 1.2;
+  transition: background 0.12s, color 0.12s;
+}
+
+.md-toolbar-btn:hover {
+  background: var(--surface3);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.md-toolbar-btn:active {
+  background: var(--border);
+}
+
+#noteWritePane textarea {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.markdown-body {
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--text-mid);
 }
 
 .note-footer {
@@ -1203,7 +1389,6 @@ body.light-theme .icon-refresh {
   color: var(--text-mid);
   font-family: var(--font-sans);
   line-height: 1.6;
-  white-space: pre-wrap;
   max-height: 150px;
   overflow: hidden;
   position: relative;
