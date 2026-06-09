@@ -327,7 +327,7 @@ Dean Hume
 
 ## Version History
 
-### 1.2.0 (2026-06-09)
+### 1.1.7 (2026-06-09)
 - Added Markdown support with live preview - notes render headings, bold, italic, lists, code blocks, links, and more
 - Added formatting toolbar (bold, italic, heading, lists, code, link, checkbox) for easy markdown without memorizing syntax
 - Keyboard shortcuts: Ctrl+B for bold, Ctrl+I for italic
