@@ -166,8 +166,18 @@
         </div>
         <div class="field">
           <label>Notes <span class="required">*</span></label>
+          <div class="note-editor-tabs">
+            <button class="note-tab active" id="noteTabWrite" data-tab="write">Write</button>
+            <button class="note-tab" id="noteTabPreview" data-tab="preview">Preview</button>
+            <span class="note-editor-hint">Supports Markdown formatting</span>
+          </div>
           <div class="autosave-indicator hidden" id="autosaveIndicator">Autosaved recently</div>
-          <textarea id="noteContentInput" placeholder="What was discussed, decisions made, action items…" rows="12"></textarea>
+          <div id="noteWritePane">
+            <textarea id="noteContentInput" placeholder="What was discussed, decisions made, action items…" rows="12"></textarea>
+          </div>
+          <div id="notePreviewPane" class="note-preview-pane hidden">
+            <div class="markdown-body" id="notePreviewContent"></div>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -243,6 +253,7 @@
     </div>
   </div>
 
+  <script src="/js/markdown.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

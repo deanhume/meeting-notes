@@ -164,7 +164,7 @@ function renderDashboard(recentNotes) {
           <div class="dashboard-note-date">${formatDate(note.createdAt)}</div>
         </div>
         ${note.title ? `<div class="dashboard-note-title">${escHtml(note.title)}</div>` : ''}
-        <div class="dashboard-note-content">${escHtml(note.content)}</div>
+        <div class="dashboard-note-content">${renderMarkdown(note.content)}</div>
         ${tagsHtml}
       </div>
     `;
@@ -276,7 +276,7 @@ function renderNotes() {
             ${isEdited ? `<div class="date-edited">edited ${formatDate(note.updatedAt)}</div>` : ''}
           </div>
         </div>
-        <div class="note-content ${longNote ? 'collapsed' : ''}">${escHtml(note.content)}</div>
+        <div class="note-content ${longNote ? 'collapsed' : ''}">${renderMarkdown(note.content)}</div>
         ${tagsHtml}
         <div class="note-footer">
           ${longNote ? `<button class="note-expand-btn" data-expanded="false">Show more ↓</button>` : '<span></span>'}
@@ -579,6 +579,7 @@ function openNewNote() {
   editingNoteId = null;
   currentTags = [];
   resetAutosave();
+  switchNoteTab('write');
   document.getElementById('noteModalTitle').textContent = 'New meeting note';
   document.getElementById('noteTitleInput').value = '';
   document.getElementById('noteContentInput').value = '';
@@ -595,6 +596,7 @@ function openEditNote(noteId) {
   editingNoteId = noteId;
   currentTags = [...(note.tags || [])];
   resetAutosave();
+  switchNoteTab('write');
   document.getElementById('noteModalTitle').textContent = 'Edit note';
   document.getElementById('noteTitleInput').value = note.title || '';
   document.getElementById('noteContentInput').value = note.content;
@@ -828,6 +830,10 @@ function wireEvents() {
     }
   });
 
+  // Note editor tabs (Write / Preview)
+  document.getElementById('noteTabWrite').addEventListener('click', () => switchNoteTab('write'));
+  document.getElementById('noteTabPreview').addEventListener('click', () => switchNoteTab('preview'));
+
   // Confirm modal
   document.getElementById('confirmCancel').addEventListener('click', closeConfirm);
   document.getElementById('confirmModal').addEventListener('click', e => {
@@ -871,6 +877,31 @@ function wireEvents() {
       else if (!document.getElementById('questionsModal').classList.contains('hidden')) saveQuestionsModal();
     }
   });
+}
+
+/* ── Note Editor Tabs (Write/Preview) ─────────────────────── */
+function switchNoteTab(tab) {
+  const writeTab = document.getElementById('noteTabWrite');
+  const previewTab = document.getElementById('noteTabPreview');
+  const writePane = document.getElementById('noteWritePane');
+  const previewPane = document.getElementById('notePreviewPane');
+  const previewContent = document.getElementById('notePreviewContent');
+
+  if (tab === 'preview') {
+    const content = document.getElementById('noteContentInput').value;
+    previewContent.innerHTML = content.trim()
+      ? renderMarkdown(content)
+      : '<p style="color:var(--text-dim);font-style:italic;">Nothing to preview</p>';
+    writePane.classList.add('hidden');
+    previewPane.classList.remove('hidden');
+    writeTab.classList.remove('active');
+    previewTab.classList.add('active');
+  } else {
+    writePane.classList.remove('hidden');
+    previewPane.classList.add('hidden');
+    writeTab.classList.add('active');
+    previewTab.classList.remove('active');
+  }
 }
 
 /* ── Init ─────────────────────────────────────────────────── */
