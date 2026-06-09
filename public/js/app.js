@@ -904,6 +904,81 @@ function switchNoteTab(tab) {
   }
 }
 
+/* ── Markdown Toolbar ──────────────────────────────────────── */
+function wireMarkdownToolbar() {
+  document.getElementById('mdToolbar').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-md]');
+    if (!btn) return;
+    const action = btn.dataset.md;
+    const textarea = document.getElementById('noteContentInput');
+    applyMarkdownAction(textarea, action);
+    textarea.focus();
+  });
+
+  // Keyboard shortcuts in textarea
+  document.getElementById('noteContentInput').addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      e.preventDefault();
+      applyMarkdownAction(document.getElementById('noteContentInput'), 'bold');
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+      e.preventDefault();
+      applyMarkdownAction(document.getElementById('noteContentInput'), 'italic');
+    }
+  });
+}
+
+function applyMarkdownAction(textarea, action) {
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+  const selected = text.substring(start, end);
+  let before = '', after = '', insert = '';
+
+  switch (action) {
+    case 'bold':
+      before = '**'; after = '**';
+      insert = selected || 'bold text';
+      break;
+    case 'italic':
+      before = '*'; after = '*';
+      insert = selected || 'italic text';
+      break;
+    case 'heading':
+      before = '## '; after = '';
+      insert = selected || 'Heading';
+      break;
+    case 'ul':
+      before = '- '; after = '';
+      insert = selected || 'List item';
+      break;
+    case 'ol':
+      before = '1. '; after = '';
+      insert = selected || 'List item';
+      break;
+    case 'code':
+      before = '`'; after = '`';
+      insert = selected || 'code';
+      break;
+    case 'link':
+      before = '['; after = '](url)';
+      insert = selected || 'link text';
+      break;
+    case 'checkbox':
+      before = '- [ ] '; after = '';
+      insert = selected || 'Task';
+      break;
+  }
+
+  const replacement = before + insert + after;
+  textarea.value = text.substring(0, start) + replacement + text.substring(end);
+
+  // Position cursor: select the inserted text (between markers)
+  const cursorStart = start + before.length;
+  const cursorEnd = cursorStart + insert.length;
+  textarea.setSelectionRange(cursorStart, cursorEnd);
+}
+
 /* ── Init ─────────────────────────────────────────────────── */
 async function init() {
   try {
@@ -914,6 +989,7 @@ async function init() {
     renderPeopleList();
     wireEvents();
     wireTagsInput();
+    wireMarkdownToolbar();
     setupAutosave();
     await loadNoteCounts();
     await loadVersion();

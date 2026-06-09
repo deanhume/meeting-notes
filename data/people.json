@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "id": "d4dab309b3d2",
+    "name": "Test Person",
+    "role": "Dev",
+    "team": "Core",
+    "createdAt": "2026-06-09T16:41:51.398Z"
+  },
+  {
+    "id": "025204cee575",
+    "name": "Jane Doe",
+    "role": "PM",
+    "team": "Core",
+    "createdAt": "2026-06-09T16:49:35.364Z"
+  }
+]
