@@ -17,11 +17,13 @@ A desktop application for tracking meeting notes with individuals. Built with El
 - ✏️ Rich text editing for notes
 - 💾 Autosave functionality - notes automatically save every 20 keystrokes when editing
 - 🌐 Works completely offline with embedded fonts
+- 🔄 Automatic software updates via GitHub Releases
 - 📄 Marketing landing page included
 
 ## Tech Stack
 
 - **Electron.js** - Desktop application framework
+- **electron-updater** - Automatic software updates
 - **Express.js** - Backend server for API
 - **Vanilla JavaScript** - Frontend UI
 - **JSON** - Data storage
@@ -35,10 +37,19 @@ A desktop application for tracking meeting notes with individuals. Built with El
 
 ### For End Users
 
-1. Download the latest `Meeting Notes Setup 1.0.0.exe` from the releases
+**Windows:**
+1. Download the latest `Meeting Notes Setup x.x.x.exe` from the releases
 2. Run the installer
 3. Follow the installation wizard
 4. Launch "Meeting Notes" from your desktop or start menu
+5. **Automatic updates** - The app will check for updates automatically and notify you when new versions are available
+
+**macOS:**
+1. Download the latest `Meeting Notes-x.x.x.dmg` or `.zip` from the releases
+2. Open the DMG file and drag "Meeting Notes" to Applications (or unzip the .zip file)
+3. Launch "Meeting Notes" from Applications
+4. If you see a security warning, go to System Preferences → Security & Privacy and click "Open Anyway"
+5. **Automatic updates** - The app will check for updates automatically and notify you when new versions are available
 
 ### For Developers
 
@@ -155,7 +166,8 @@ npm run build
 ```
 
 This will create:
-- `dist/Meeting Notes Setup 1.0.0.exe` - NSIS installer
+- `dist/Meeting Notes Setup x.x.x.exe` - NSIS installer
+- `dist/latest.yml` - **Required for auto-updates** - upload this to GitHub Releases
 - `dist/win-unpacked/` - Unpacked application files
 
 ### Build to Directory Only (for testing)
@@ -168,23 +180,85 @@ This creates an unpacked version without the installer for quick testing.
 
 ### Build Configuration
 
-The build configuration is in `package.json` under the `build` key:
+The build configuration is in `package.json` under the `build` key. It includes settings for both Windows and macOS builds, including icon configuration, installers, and platform-specific options. The `publish` section enables automatic updates via GitHub Releases.
 
+## Auto-Updates
+
+Meeting Notes uses **electron-updater** to provide seamless automatic updates via GitHub Releases.
+
+### How It Works
+
+1. **Automatic Checking** - App checks for updates every hour and 3 seconds after startup
+2. **User Choice** - When an update is available, users see a friendly dialog asking if they want to download
+3. **Background Download** - Updates download while the app continues running
+4. **Easy Installation** - After download, users can restart immediately or later to install
+
+### User Experience
+
+- **Non-intrusive** - Users are never forced to update
+- **No interruptions** - If there's no update, users see nothing
+- **Transparent** - Clear dialogs explain what's happening
+- **Automatic on quit** - Updates install automatically when the app closes (if downloaded)
+
+### Publishing Updates
+
+To release a new version that users will automatically receive:
+
+1. **Build your app:**
+   ```bash
+   npm run build        # Windows
+   npm run build:mac    # macOS
+   npm run build:all    # Both platforms
+   ```
+
+2. **Find the generated files in `dist/` folder:**
+   - **Windows:** `Meeting Notes Setup x.x.x.exe` + `latest.yml`
+   - **macOS:** `Meeting Notes-x.x.x.dmg` + `Meeting Notes-x.x.x-mac.zip` + `latest-mac.yml`
+
+3. **Create a GitHub Release:**
+   - Go to https://github.com/deanhume/meeting-notes/releases/new
+   - Create a tag (e.g., `v1.1.8`) - version must be higher than current
+   - Add release title and notes
+   - **Upload ALL files** including the `.yml` files (critical for auto-updates!)
+   - Publish the release
+
+4. **Users get notified automatically** within an hour (or next time they start the app)
+
+### Critical Files
+
+The `.yml` files are **required** for auto-updates to work:
+- `latest.yml` - Generated automatically by electron-builder for Windows
+- `latest-mac.yml` - Generated automatically by electron-builder for macOS
+
+**Without these files, auto-updates will not work!**
+
+### Documentation
+
+- **[AUTO_UPDATES.md](AUTO_UPDATES.md)** - Complete guide with testing, troubleshooting, and advanced configuration
+- **[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)** - Quick reference for publishing updates
+
+### Technical Details
+
+- Uses `electron-updater` (modern replacement for Squirrel)
+- Updates are downloaded via HTTPS from GitHub Releases
+- Logs are stored at:
+  - Windows: `%APPDATA%\meeting-notes\logs\main.log`
+  - macOS: `~/Library/Logs/meeting-notes/main.log`
+- Auto-updates only work in packaged builds (not during `npm start`)
+
+### Configuration
+
+The update configuration in `package.json`:
 ```json
 {
   "build": {
-    "appId": "com.deanhume.meetingnotes",
-    "productName": "Meeting Notes",
-    "win": {
-      "target": "nsis",
-      "icon": "public/images/logo-256.png"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
-    }
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "deanhume",
+        "repo": "meeting-notes"
+      }
+    ]
   }
 }
 ```
@@ -193,11 +267,14 @@ The build configuration is in `package.json` under the `build` key:
 
 | Command | Description |
 |---------|-------------|
-| `npm start` | Start the Electron app |
+| `npm start` | Start the Electron app in development mode |
 | `npm run dev` | Start in development mode (same as start) |
-| `npm run web` | Run as web server only |
-| `npm run build` | Build Windows installer |
-| `npm run build:dir` | Build to directory without installer |
+| `npm run web` | Run as standalone web server (testing only) |
+| `npm run build` | Build Windows installer with auto-updates |
+| `npm run build:dir` | Build Windows to directory without installer |
+| `npm run build:mac` | Build macOS installers (DMG and ZIP) with auto-updates |
+| `npm run build:mac:dir` | Build macOS to directory without installer |
+| `npm run build:all` | Build for both Windows and macOS with auto-updates |
 
 ## Settings
 

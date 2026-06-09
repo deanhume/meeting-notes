@@ -7,6 +7,7 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const express = require('express');
+const { autoUpdater } = require('electron-updater');
 const { safeLoadJSON, atomicWriteFile, createApiRoutes } = require('./shared');
 
 let mainWindow;
@@ -26,6 +27,56 @@ function loadSettings() {
 
 function saveSettings(settings) {
   atomicWriteFile(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+}
+
+// Configure auto-updater
+function setupAutoUpdater() {
+  // Log auto-updater events
+  autoUpdater.logger = require('electron-log');
+  autoUpdater.logger.transports.file.level = 'info';
+  
+  // Check for updates every hour
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', (info) => {
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Update Available',
+      message: `A new version (${info.version}) is available. Would you like to download it now?`,
+      buttons: ['Download', 'Later']
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.downloadUpdate();
+      }
+    });
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Update Ready',
+      message: 'Update downloaded. The application will restart to install the update.',
+      buttons: ['Restart Now', 'Later']
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall(false, true);
+      }
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('Auto-updater error:', err);
+  });
+
+  // Check for updates on startup (after a delay) and then every hour
+  setTimeout(() => {
+    autoUpdater.checkForUpdates();
+  }, 3000);
+  
+  setInterval(() => {
+    autoUpdater.checkForUpdates();
+  }, 60 * 60 * 1000); // Check every hour
 }
 
 // Create the main Electron browser window
@@ -103,6 +154,13 @@ ipcMain.handle('select-folder', async () => {
 app.whenReady().then(async () => {
   await startServer();
   createWindow();
+  
+  // Setup auto-updater after window is created
+  if (!app.isPackaged) {
+    console.log('Running in development mode - auto-updates disabled');
+  } else {
+    setupAutoUpdater();
+  }
 
   app.on('activate', function () {
     if (mainWindow === null) createWindow();

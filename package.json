@@ -8,12 +8,21 @@
     "start": "electron .",
     "dev": "electron .",
     "web": "node server.js",
-    "build": "npm version patch --no-git-tag-version && electron-builder --win --x64  ",
+    "bump": "npm version patch --no-git-tag-version",
+    "build": "electron-builder --win --x64  ",
+    "buildnobump": "electron-builder --win --x64  ",
     "build:dir": "npm version patch --no-git-tag-version && electron-builder --win --x64 --dir"
   },
   "build": {
     "appId": "com.deanhume.meetingnotes",
     "productName": "Meeting Notes",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "deanhume",
+        "repo": "meeting-notes"
+      }
+    ],
     "win": {
       "target": "nsis",
       "icon": "public/images/logo-256.png"
@@ -34,10 +43,12 @@
     ]
   },
   "dependencies": {
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9",
     "express": "^4.18.2"
   },
   "devDependencies": {
-    "electron": "^42.0.1",
-    "electron-builder": "^26.8.1"
+    "electron": "^42.3.3",
+    "electron-builder": "^26.15.2"
   }
 }
