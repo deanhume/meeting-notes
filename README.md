@@ -15,6 +15,7 @@ A desktop application for tracking meeting notes with individuals. Built with El
 - 🎨 Clean, minimalist interface with light/dark theme toggle
 - 📋 Pre-configured discussion questions for meetings
 - ✏️ Rich text editing for notes
+- ✍️ Markdown support with live preview and formatting toolbar
 - 💾 Autosave functionality - notes automatically save every 20 keystrokes when editing
 - 🌐 Works completely offline with embedded fonts
 - 🔄 Automatic software updates via GitHub Releases
@@ -325,6 +326,12 @@ MIT License - feel free to use this project for personal or commercial purposes.
 Dean Hume
 
 ## Version History
+
+### 1.2.0 (2026-06-09)
+- Added Markdown support with live preview - notes render headings, bold, italic, lists, code blocks, links, and more
+- Added formatting toolbar (bold, italic, heading, lists, code, link, checkbox) for easy markdown without memorizing syntax
+- Keyboard shortcuts: Ctrl+B for bold, Ctrl+I for italic
+- Write/Preview tab toggle in the note editor
 
 ### 1.1.0 (2026-05-20)
 - Added autosave functionality - notes automatically save every 20 keystrokes when editing
