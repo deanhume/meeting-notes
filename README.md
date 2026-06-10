@@ -22,7 +22,6 @@ A desktop app for tracking meeting notes with individuals. Built with Electron.j
 Download the latest release from the [Releases page](https://github.com/deanhume/meeting-notes/releases):
 
 - **Windows** — run `Meeting Notes Setup x.x.x.exe`
-- **macOS** — open the `.dmg` and drag to Applications
 
 Updates are delivered automatically after install.
 
