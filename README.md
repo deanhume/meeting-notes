@@ -2,7 +2,7 @@
 
 A desktop app for tracking meeting notes with individuals. Built with Electron.js and Express.
 
-![Meeting Notes](public/images/logo-256.png)
+<img src="public/images/logo-256.png" alt="drawing" width="400"/>
 
 ## Features
 
@@ -41,8 +41,8 @@ npm start
 | [Development Guide](docs/DEVELOPMENT.md) | Project structure, API endpoints, scripts, data storage |
 | [Building & Distribution](docs/BUILDING.md) | Creating installers, build config |
 | [Usage & Troubleshooting](docs/USAGE.md) | Settings, keyboard shortcuts, common issues |
-| [Auto-Updates](AUTO_UPDATES.md) | How updates work, testing, troubleshooting |
-| [Release Checklist](RELEASE_CHECKLIST.md) | Step-by-step guide for publishing new versions |
+| [Auto-Updates](docs/AUTO_UPDATES.md) | How updates work, testing, troubleshooting |
+| [Release Checklist](docs/RELEASE_CHECKLIST.md) | Step-by-step guide for publishing new versions |
 
 ## Tech Stack
 
