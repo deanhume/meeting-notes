@@ -2,7 +2,7 @@
 
 A desktop app for tracking meeting notes with individuals. Built with Electron.js and Express.
 
-<img src="public/images/logo-256.png" alt="drawing" width="400"/>
+<img src="public/images/logo-256.png" alt="drawing" width="150"/>
 
 ## Features
 
