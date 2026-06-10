@@ -35,28 +35,15 @@ function setupAutoUpdater() {
   autoUpdater.logger = require('electron-log');
   autoUpdater.logger.transports.file.level = 'info';
   
-  // Check for updates every hour
-  autoUpdater.autoDownload = false;
+  // Silently download updates in the background
+  autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
-  autoUpdater.on('update-available', (info) => {
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Update Available',
-      message: `A new version (${info.version}) is available. Would you like to download it now?`,
-      buttons: ['Download', 'Later']
-    }).then((result) => {
-      if (result.response === 0) {
-        autoUpdater.downloadUpdate();
-      }
-    });
-  });
-
-  autoUpdater.on('update-downloaded', () => {
+  autoUpdater.on('update-downloaded', (info) => {
     dialog.showMessageBox(mainWindow, {
       type: 'info',
       title: 'Update Ready',
-      message: 'Update downloaded. The application will restart to install the update.',
+      message: `Version ${info.version} has been downloaded and will be installed when you restart.`,
       buttons: ['Restart Now', 'Later']
     }).then((result) => {
       if (result.response === 0) {
