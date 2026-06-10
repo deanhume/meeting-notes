@@ -1,3 +1,4 @@
+[![Tests](https://github.com/deanhume/meeting-notes/actions/workflows/test.yml/badge.svg)](https://github.com/deanhume/meeting-notes/actions/workflows/test.yml)
 # Meeting Notes
 
 A desktop app for tracking meeting notes with individuals. Built with Electron.js and Express.
