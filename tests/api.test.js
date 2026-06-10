@@ -3,7 +3,7 @@ const path = require('path');
 const os = require('os');
 const express = require('express');
 const request = require('supertest');
-const { createApiRoutes } = require('./shared');
+const { createApiRoutes } = require('../shared');
 
 let app;
 let tmpDir;

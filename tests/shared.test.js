@@ -10,17 +10,20 @@ const {
   validatePersonData,
   validateNoteData,
   validateQuestionsData,
-} = require('./shared');
+} = require('../shared');
 
 // ── Helper: create a temp directory for file-based tests ──────
 
 let tmpDir;
+let consoleErrorSpy;
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'meeting-notes-test-'));
+  consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 afterEach(() => {
+  consoleErrorSpy.mockRestore();
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
