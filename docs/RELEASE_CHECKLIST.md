@@ -6,12 +6,6 @@
 ```bash
 # For Windows
 npm run build
-
-# For macOS  
-npm run build:mac
-
-# For both
-npm run build:all
 ```
 
 ### 2. Files Created in `dist/` folder
