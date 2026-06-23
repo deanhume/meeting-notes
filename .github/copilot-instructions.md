@@ -7,6 +7,7 @@ Electron desktop app for tracking meeting notes about people in your organizatio
 ```bash
 npm start          # Launch the Electron app (alias: npm run dev)
 npm run web        # Run as a standalone Express server at http://localhost:3000
+npm run fetch-model # Download the Whisper STT model (~140 MB) into models/
 npm test           # Run the full Jest suite
 npm run build      # Build the Windows NSIS installer (electron-builder)
 ```

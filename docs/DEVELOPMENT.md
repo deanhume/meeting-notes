@@ -18,6 +18,13 @@
    npm install
    ```
 
+3. Download the speech-to-text model (for the in-app voice recording feature):
+   ```bash
+   npm run fetch-model
+   ```
+   This downloads `models/ggml-base.bin` (~140 MB). It is not committed to git. The
+   Record button in the note editor stays hidden until this model is present.
+
 ## Running in Development Mode
 
 Start the Electron app:
@@ -113,6 +120,7 @@ The application stores data in JSON files:
 |---------|-------------|
 | `npm start` | Start the Electron app in development mode |
 | `npm run dev` | Start in development mode (same as start) |
+| `npm run fetch-model` | Download the Whisper speech-to-text model into `models/` |
 | `npm run web` | Run as standalone web server (testing only) |
 | `npm run build` | Build Windows installer with auto-updates |
 | `npm run build:dir` | Build Windows to directory without installer |

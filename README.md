@@ -32,8 +32,13 @@ Updates are delivered automatically after install.
 git clone https://github.com/deanhume/meeting-notes.git
 cd meeting-notes
 npm install
+npm run fetch-model   # downloads the local speech-to-text model (~140 MB)
 npm start
 ```
+
+> The Whisper model (`models/ggml-base.bin`) powers offline voice transcription. It is
+> not committed to git; `npm run fetch-model` downloads it. The Record button is hidden
+> until the model is present.
 
 ## Documentation
 
