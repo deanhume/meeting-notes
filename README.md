@@ -1,4 +1,5 @@
 [![Tests](https://github.com/deanhume/meeting-notes/actions/workflows/test.yml/badge.svg)](https://github.com/deanhume/meeting-notes/actions/workflows/test.yml)
+
 <img src="public/images/logo-256.png" alt="drawing" width="150"/>
 
 # Meeting Notes
