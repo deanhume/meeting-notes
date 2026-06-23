@@ -23,6 +23,9 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
-      - run: npm ci
+      # smart-whisper compiles a native addon (whisper.cpp) via node-gyp on install.
+      # The test suite only exercises the pure-JS HTTP API, so skip install scripts
+      # to avoid an unnecessary (and fragile) native build on the CI runner.
+      - run: npm ci --ignore-scripts
 
       - run: npm test
