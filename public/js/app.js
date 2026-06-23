@@ -1152,8 +1152,9 @@ async function handleRecordingStop() {
     const pcm = await blobToPcm16kMono(blob);
     const text = await window.electronAPI.transcribeAudio(pcm);
     if (text) {
-      insertTranscript(text);
-      setRecordStatus('Transcribed');
+      const summary = summarizeToBullets(text);
+      insertTranscript(summary);
+      setRecordStatus('Summarised');
     } else {
       setRecordStatus('No speech detected');
     }
@@ -1186,6 +1187,67 @@ async function blobToPcm16kMono(blob) {
   src.start();
   const rendered = await offline.startRendering();
   return rendered.getChannelData(0);
+}
+
+// Common English stopwords ignored when scoring sentence importance.
+const SUMMARY_STOPWORDS = new Set(('a an and the of to in on for with at by from up about into over after ' +
+  'is are was were be been being am do does did doing have has had having will would shall should can could ' +
+  'may might must this that these those it its it\'s i you he she we they me him her us them my your his our their ' +
+  'so but or nor if then else than as too very just not no yes ok okay yeah um uh like really actually basically ' +
+  'kind sort going get got go went said say says know think thing things stuff well right mean lot bit one').split(/\s+/));
+
+function summaryWords(s) {
+  return (s.toLowerCase().match(/[a-z0-9']+/g) || []);
+}
+
+function tidySentence(s) {
+  let out = s.trim().replace(/\s+/g, ' ');
+  if (!out) return out;
+  out = out.charAt(0).toUpperCase() + out.slice(1);
+  if (!/[.!?]$/.test(out)) out += '.';
+  return out;
+}
+
+// Extractive, fully on-device summariser: scores sentences by the frequency of
+// their meaningful (non-stopword) terms and keeps the top few, in original order.
+function summarizeToBullets(transcript) {
+  const clean = (transcript || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+
+  const sentences = (clean.match(/[^.!?]+[.!?]*/g) || [clean])
+    .map((s) => s.trim())
+    .filter((s) => summaryWords(s).length >= 4);
+
+  // Too short to summarise meaningfully — bullet it as-is.
+  if (sentences.length <= 1) {
+    return '- ' + tidySentence(clean);
+  }
+
+  const freq = Object.create(null);
+  sentences.forEach((s) => {
+    summaryWords(s).forEach((w) => {
+      if (!SUMMARY_STOPWORDS.has(w) && w.length > 2) {
+        freq[w] = (freq[w] || 0) + 1;
+      }
+    });
+  });
+
+  const scored = sentences.map((s, i) => {
+    const terms = summaryWords(s).filter((w) => !SUMMARY_STOPWORDS.has(w) && w.length > 2);
+    const raw = terms.reduce((sum, w) => sum + (freq[w] || 0), 0);
+    // Normalise by sqrt(length) so long sentences don't dominate.
+    const score = terms.length ? raw / Math.sqrt(terms.length) : 0;
+    return { s, i, score };
+  });
+
+  const count = Math.min(7, Math.max(3, Math.round(sentences.length * 0.3)));
+  const top = scored
+    .slice()
+    .sort((a, b) => b.score - a.score)
+    .slice(0, count)
+    .sort((a, b) => a.i - b.i); // restore chronological order
+
+  return top.map((o) => '- ' + tidySentence(o.s)).join('\n');
 }
 
 function insertTranscript(text) {
