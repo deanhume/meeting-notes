@@ -11,6 +11,7 @@ A desktop app for tracking meeting notes with individuals. Built with Electron.j
 - 👥 Manage contacts with names, roles, and teams
 - 🏷️ Tag and filter notes by topic
 - ✍️ Markdown support with live preview
+- 🎙️ Voice recording with offline speech-to-text (mic and/or system audio)
 - 💾 Autosave & local-only data storage
 - 🎨 Light/dark theme
 - 🔄 Automatic updates via GitHub Releases
@@ -55,6 +56,9 @@ npm start
 Electron.js · Express.js · Vanilla JS · JSON storage · electron-updater
 
 ## Version History
+
+### 1.2.0 (2026-06-23)
+- Voice recording with offline speech-to-text — record mic and/or system audio and transcribe directly into notes
 
 ### 1.1.7 (2026-06-09)
 - Markdown support with live preview and formatting toolbar
