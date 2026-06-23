@@ -38,10 +38,20 @@
     "files": [
       "main.js",
       "preload.js",
+      "transcription.js",
       "server.js",
       "shared.js",
       "public/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "models/ggml-base.bin",
+        "to": "models/ggml-base.bin"
+      }
+    ],
+    "asarUnpack": [
+      "**/node_modules/smart-whisper/**"
     ]
   },
   "dependencies": {
