@@ -182,6 +182,17 @@
               <button type="button" class="md-toolbar-btn" data-md="code" title="Inline code">&lt;/&gt;</button>
               <button type="button" class="md-toolbar-btn" data-md="link" title="Link">🔗</button>
               <button type="button" class="md-toolbar-btn" data-md="checkbox" title="Checkbox">☑</button>
+              <span class="md-toolbar-spacer"></span>
+              <select id="recordSource" class="record-source hidden" title="Audio source to record">
+                <option value="both">Mic + system</option>
+                <option value="mic">Mic only</option>
+                <option value="system">System only</option>
+              </select>
+              <button type="button" class="md-toolbar-btn record-btn hidden" id="recordBtn" title="Record speech and transcribe it into this note">
+                <span class="record-dot"></span><span id="recordBtnLabel">Record</span>
+              </button>
+              <span class="record-status" id="recordStatus" aria-live="polite"></span>
+              <span class="record-warning hidden" id="recordWarning" aria-live="polite"></span>
             </div>
             <textarea id="noteContentInput" placeholder="What was discussed, decisions made, action items…" rows="12"></textarea>
           </div>

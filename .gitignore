@@ -72,6 +72,12 @@ web_modules/
 # Yarn Integrity file
 .yarn-integrity
 
+# Whisper speech-to-text models (large binaries, fetched/bundled separately)
+models/*.bin
+
+# Phase 0 spike scratch artifacts
+spike/
+
 # dotenv environment variable files
 .env
 .env.development.local

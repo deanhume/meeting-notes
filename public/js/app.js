@@ -979,6 +979,225 @@ function applyMarkdownAction(textarea, action) {
   textarea.setSelectionRange(cursorStart, cursorEnd);
 }
 
+/* ── Voice recording → local transcription ────────────────── */
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordSources = [];   // raw MediaStreams to stop on cleanup
+let mixContext = null;    // AudioContext used when mixing mic + system
+let recordStream = null;  // audio-only stream fed to MediaRecorder
+let recordTimerInterval = null;
+let recordStartTime = 0;
+let isTranscribing = false;
+
+// Recording-duration thresholds (seconds): warn near, then past, ~15 min.
+const RECORD_WARN_SECONDS = 13 * 60;
+const RECORD_HARD_SECONDS = 15 * 60;
+
+function transcriptionSupported() {
+  return !!(window.electronAPI && window.electronAPI.transcribeAudio &&
+    navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+}
+
+async function wireRecordButton() {
+  const btn = document.getElementById('recordBtn');
+  if (!btn || !transcriptionSupported()) return; // stays hidden (e.g. web mode)
+  try {
+    const available = await window.electronAPI.transcriptionAvailable();
+    if (!available) return; // model not present — keep hidden
+  } catch {
+    return;
+  }
+  btn.classList.remove('hidden');
+  document.getElementById('recordSource').classList.remove('hidden');
+  btn.addEventListener('click', toggleRecording);
+}
+
+function setRecordStatus(text) {
+  document.getElementById('recordStatus').textContent = text || '';
+}
+
+async function toggleRecording() {
+  if (isTranscribing) return;
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    stopRecording();
+  } else {
+    await startRecording();
+  }
+}
+
+// Build a single audio-only MediaStream from the selected source(s).
+async function buildCaptureStream(mode) {
+  let micStream = null;
+  let sysStream = null;
+
+  if (mode === 'mic' || mode === 'both') {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recordSources.push(micStream);
+  }
+  if (mode === 'system' || mode === 'both') {
+    // Video is required for loopback capture in Electron; we discard it.
+    sysStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+    recordSources.push(sysStream);
+    sysStream.getVideoTracks().forEach((t) => t.stop());
+    if (!sysStream.getAudioTracks().length) {
+      throw new Error('No system audio track available');
+    }
+  }
+
+  if (mode === 'mic') return new MediaStream(micStream.getAudioTracks());
+  if (mode === 'system') return new MediaStream(sysStream.getAudioTracks());
+
+  // both → mix into one track via Web Audio
+  mixContext = new (window.AudioContext || window.webkitAudioContext)();
+  const dest = mixContext.createMediaStreamDestination();
+  mixContext.createMediaStreamSource(new MediaStream(micStream.getAudioTracks())).connect(dest);
+  mixContext.createMediaStreamSource(new MediaStream(sysStream.getAudioTracks())).connect(dest);
+  return dest.stream;
+}
+
+async function startRecording() {
+  const mode = document.getElementById('recordSource').value;
+  recordSources = [];
+  mixContext = null;
+  try {
+    recordStream = await buildCaptureStream(mode);
+  } catch (e) {
+    console.error('Capture failed:', e);
+    cleanupRecordStream();
+    setRecordStatus(mode === 'mic' ? 'Microphone access denied' : 'Audio capture unavailable');
+    return;
+  }
+
+  recordedChunks = [];
+  mediaRecorder = new MediaRecorder(recordStream);
+  mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = handleRecordingStop;
+  mediaRecorder.start();
+
+  document.getElementById('recordSource').disabled = true;
+  const btn = document.getElementById('recordBtn');
+  btn.classList.add('recording');
+  document.getElementById('recordBtnLabel').textContent = 'Stop';
+  recordStartTime = Date.now();
+  updateRecordTimer();
+  recordTimerInterval = setInterval(updateRecordTimer, 1000);
+}
+
+function updateRecordTimer() {
+  const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
+  const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const s = String(elapsed % 60).padStart(2, '0');
+  setRecordStatus(`Recording ${m}:${s}`);
+  updateRecordWarning(elapsed);
+}
+
+// Warn as the recording approaches the ~15 min point, where transcription
+// becomes slow and memory-heavy.
+function updateRecordWarning(elapsed) {
+  const warning = document.getElementById('recordWarning');
+  if (elapsed >= RECORD_HARD_SECONDS) {
+    warning.textContent = '⚠ Very long recording — transcription will be slow & memory-heavy';
+    warning.classList.remove('hidden');
+    warning.classList.add('severe');
+  } else if (elapsed >= RECORD_WARN_SECONDS) {
+    const remaining = Math.max(0, Math.ceil((RECORD_HARD_SECONDS - elapsed) / 60));
+    warning.textContent = `⚠ Approaching ${RECORD_HARD_SECONDS / 60} min — consider stopping soon (~${remaining} min left)`;
+    warning.classList.remove('hidden', 'severe');
+  } else {
+    clearRecordWarning();
+  }
+}
+
+function clearRecordWarning() {
+  const warning = document.getElementById('recordWarning');
+  warning.classList.add('hidden');
+  warning.classList.remove('severe');
+  warning.textContent = '';
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+}
+
+function cleanupRecordStream() {
+  recordSources.forEach((s) => s.getTracks().forEach((t) => t.stop()));
+  recordSources = [];
+  if (mixContext) {
+    mixContext.close();
+    mixContext = null;
+  }
+  recordStream = null;
+  if (recordTimerInterval) {
+    clearInterval(recordTimerInterval);
+    recordTimerInterval = null;
+  }
+}
+
+async function handleRecordingStop() {
+  const btn = document.getElementById('recordBtn');
+  btn.classList.remove('recording');
+  document.getElementById('recordBtnLabel').textContent = 'Record';
+  clearRecordWarning();
+  cleanupRecordStream();
+
+  if (!recordedChunks.length) { setRecordStatus(''); return; }
+
+  isTranscribing = true;
+  btn.classList.add('transcribing');
+  btn.disabled = true;
+  setRecordStatus('Transcribing…');
+
+  try {
+    const blob = new Blob(recordedChunks, { type: recordedChunks[0].type || 'audio/webm' });
+    const pcm = await blobToPcm16kMono(blob);
+    const text = await window.electronAPI.transcribeAudio(pcm);
+    if (text) {
+      insertTranscript(text);
+      setRecordStatus('Transcribed');
+    } else {
+      setRecordStatus('No speech detected');
+    }
+  } catch (e) {
+    console.error('Transcription failed:', e);
+    setRecordStatus('Transcription failed');
+  } finally {
+    isTranscribing = false;
+    btn.classList.remove('transcribing');
+    btn.disabled = false;
+    document.getElementById('recordSource').disabled = false;
+    setTimeout(() => {
+      const recording = mediaRecorder && mediaRecorder.state === 'recording';
+      if (!isTranscribing && !recording) setRecordStatus('');
+    }, 3000);
+  }
+}
+
+// Decode any captured audio and resample to the 16kHz mono PCM Whisper expects.
+async function blobToPcm16kMono(blob) {
+  const arrayBuf = await blob.arrayBuffer();
+  const decodeCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const decoded = await decodeCtx.decodeAudioData(arrayBuf);
+  decodeCtx.close();
+  const length = Math.ceil(decoded.duration * 16000);
+  const offline = new OfflineAudioContext(1, length, 16000);
+  const src = offline.createBufferSource();
+  src.buffer = decoded;
+  src.connect(offline.destination);
+  src.start();
+  const rendered = await offline.startRendering();
+  return rendered.getChannelData(0);
+}
+
+function insertTranscript(text) {
+  const textarea = document.getElementById('noteContentInput');
+  const existing = textarea.value;
+  const needsNewline = existing.length > 0 && !existing.endsWith('\n');
+  const prefix = existing.length === 0 ? '' : (needsNewline ? '\n\n' : '');
+  textarea.value = existing + prefix + text;
+  textarea.dispatchEvent(new Event('input'));
+  if (editingNoteId) autosaveNote();
+}
+
 /* ── Init ─────────────────────────────────────────────────── */
 async function init() {
   try {
@@ -990,6 +1209,7 @@ async function init() {
     wireEvents();
     wireTagsInput();
     wireMarkdownToolbar();
+    wireRecordButton();
     setupAutosave();
     await loadNoteCounts();
     await loadVersion();

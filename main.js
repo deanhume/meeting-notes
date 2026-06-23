@@ -4,11 +4,12 @@
  * All shared logic (validation, routes, helpers) lives in shared.js.
  */
 
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, session, desktopCapturer } = require('electron');
 const path = require('path');
 const express = require('express');
 const { autoUpdater } = require('electron-updater');
 const { safeLoadJSON, atomicWriteFile, createApiRoutes } = require('./shared');
+const transcription = require('./transcription');
 
 let mainWindow;
 let server;
@@ -137,9 +138,37 @@ ipcMain.handle('select-folder', async () => {
   return null;
 });
 
+// IPC handler: reports whether local speech-to-text is available (model present)
+ipcMain.handle('transcription-available', () => {
+  return transcription.isModelAvailable(app);
+});
+
+// IPC handler: transcribe 16kHz mono PCM (Float32Array) to text, fully on-device
+ipcMain.handle('transcribe-audio', async (_event, pcm) => {
+  return transcription.transcribePcm(pcm, app);
+});
+
 // Electron lifecycle: wait for server to be ready before opening the window
 app.whenReady().then(async () => {
   await startServer();
+
+  // Allow microphone access for in-app recording / transcription
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(permission === 'media');
+  });
+
+  // Grant system-audio (loopback) capture for getDisplayMedia, so meetings/videos
+  // playing on the machine can be transcribed. Windows uses WASAPI loopback.
+  session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
+    desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
+      if (!sources.length) {
+        callback();
+        return;
+      }
+      callback({ video: sources[0], audio: 'loopback' });
+    }).catch(() => callback());
+  });
+
   createWindow();
   
   // Setup auto-updater after window is created

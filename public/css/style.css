@@ -689,6 +689,83 @@ body.light-theme .theme-toggle-thumb {
   background: var(--border);
 }
 
+.md-toolbar-spacer {
+  flex: 1;
+}
+
+.record-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.record-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c0504d;
+  flex: none;
+}
+
+.record-btn.recording {
+  color: #c0504d;
+  border-color: #c0504d;
+}
+
+.record-btn.recording .record-dot {
+  animation: record-pulse 1s ease-in-out infinite;
+}
+
+.record-btn.transcribing {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.record-btn.transcribing .record-dot {
+  background: var(--text-mid);
+  animation: record-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes record-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.record-status {
+  font-size: 12px;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+  margin-left: 4px;
+}
+
+.record-source {
+  background: var(--surface);
+  color: var(--text-mid);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  padding: 3px 4px;
+  cursor: pointer;
+}
+
+.record-source:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.record-warning {
+  font-size: 12px;
+  font-weight: 600;
+  color: #b8860b;
+  margin-left: 6px;
+}
+
+.record-warning.severe {
+  color: #c0504d;
+}
+
 #noteWritePane textarea {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
