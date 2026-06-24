@@ -79,7 +79,7 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
     },
-    icon: path.join(__dirname, 'public', 'images', 'logo-256.png'),
+    icon: path.join(__dirname, 'public', 'images', 'logo-app-256.png'),
     autoHideMenuBar: true
   });
 

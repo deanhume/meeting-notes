@@ -27,7 +27,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "public/images/logo-256.png"
+      "icon": "public/images/logo-app-256.png"
     },
     "nsis": {
       "oneClick": false,
