@@ -989,6 +989,20 @@ let recordTimerInterval = null;
 let recordStartTime = 0;
 let isTranscribing = false;
 
+// Live (chunked) transcription state. While recording, audio is transcribed in
+// the background every LIVE_CHUNK_MS so that by the time the user hits Stop most
+// of the work is already done — only the final tail and the summary remain.
+let liveInterval = null;      // timer that kicks off background chunks
+let liveTranscript = '';      // running transcript assembled from chunks
+let processedSamples = 0;     // 16kHz-sample cursor: audio already transcribed
+let liveBusy = false;         // a chunk transcription is in flight
+let liveOpPromise = null;     // resolves when the in-flight chunk finishes
+
+const SAMPLE_RATE = 16000;
+const LIVE_CHUNK_MS = 20000;                       // attempt a chunk every 20s
+const LIVE_MIN_CHUNK_SAMPLES = SAMPLE_RATE * 4;    // need ≥4s of new audio
+const LIVE_EDGE_GUARD_SAMPLES = SAMPLE_RATE * 0.8; // leave ~0.8s live edge unprocessed
+
 // Recording-duration thresholds (seconds): warn near, then past, ~15 min.
 const RECORD_WARN_SECONDS = 13 * 60;
 const RECORD_HARD_SECONDS = 15 * 60;
@@ -1069,10 +1083,16 @@ async function startRecording() {
   }
 
   recordedChunks = [];
+  liveTranscript = '';
+  processedSamples = 0;
+  liveBusy = false;
+  liveOpPromise = null;
   mediaRecorder = new MediaRecorder(recordStream);
+  // A 1s timeslice makes data available regularly so the cumulative blob keeps
+  // growing and can be transcribed mid-recording.
   mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
   mediaRecorder.onstop = handleRecordingStop;
-  mediaRecorder.start();
+  mediaRecorder.start(1000);
 
   document.getElementById('recordSource').disabled = true;
   const btn = document.getElementById('recordBtn');
@@ -1081,13 +1101,15 @@ async function startRecording() {
   recordStartTime = Date.now();
   updateRecordTimer();
   recordTimerInterval = setInterval(updateRecordTimer, 1000);
+  liveInterval = setInterval(() => { transcribeLiveChunk(false); }, LIVE_CHUNK_MS);
 }
 
 function updateRecordTimer() {
   const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
   const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
   const s = String(elapsed % 60).padStart(2, '0');
-  setRecordStatus(`Recording ${m}:${s}`);
+  const live = liveTranscript ? ` · transcribing ${liveTranscript.split(/\s+/).filter(Boolean).length}w` : '';
+  setRecordStatus(`Recording ${m}:${s}${live}`);
   updateRecordWarning(elapsed);
 }
 
@@ -1131,6 +1153,10 @@ function cleanupRecordStream() {
     clearInterval(recordTimerInterval);
     recordTimerInterval = null;
   }
+  if (liveInterval) {
+    clearInterval(liveInterval);
+    liveInterval = null;
+  }
 }
 
 async function handleRecordingStop() {
@@ -1138,19 +1164,22 @@ async function handleRecordingStop() {
   btn.classList.remove('recording');
   document.getElementById('recordBtnLabel').textContent = 'Record';
   clearRecordWarning();
-  cleanupRecordStream();
+  cleanupRecordStream(); // also stops the live-chunk interval
 
   if (!recordedChunks.length) { setRecordStatus(''); return; }
 
   isTranscribing = true;
   btn.classList.add('transcribing');
   btn.disabled = true;
-  setRecordStatus('Transcribing…');
+  setRecordStatus('Finishing transcription…');
 
   try {
-    const blob = new Blob(recordedChunks, { type: recordedChunks[0].type || 'audio/webm' });
-    const pcm = await blobToPcm16kMono(blob);
-    const text = await window.electronAPI.transcribeAudio(pcm);
+    // Let any chunk that was mid-flight when Stop was pressed finish first…
+    if (liveOpPromise) { try { await liveOpPromise; } catch { /* logged in chunk */ } }
+    // …then transcribe everything still after the last cut (force = whole tail).
+    await transcribeLiveChunk(true);
+
+    const text = liveTranscript.trim();
     if (text) {
       const summary = summarizeToBullets(text);
       insertTranscript(summary);
@@ -1171,6 +1200,56 @@ async function handleRecordingStop() {
       if (!isTranscribing && !recording) setRecordStatus('');
     }, 3000);
   }
+}
+
+// Transcribe the audio captured since the last cut. Runs in the background while
+// recording (force=false, leaves a small live-edge guard and cuts on a pause) and
+// once more at Stop (force=true, flushes the entire remaining tail).
+// Re-decodes the cumulative blob each time: decoding is cheap next to Whisper, and
+// it reuses the same battle-tested decode path as the final transcription.
+async function transcribeLiveChunk(force) {
+  if (liveBusy || !recordedChunks.length) return;
+  liveBusy = true;
+  liveOpPromise = (async () => {
+    try {
+      const blob = new Blob(recordedChunks, { type: recordedChunks[0].type || 'audio/webm' });
+      const pcm = await blobToPcm16kMono(blob);
+      const edge = force ? pcm.length : Math.max(0, pcm.length - LIVE_EDGE_GUARD_SAMPLES);
+      const available = edge - processedSamples;
+      if (available < (force ? 1 : LIVE_MIN_CHUNK_SAMPLES)) return;
+
+      const cut = force ? edge : findQuietCut(pcm, processedSamples, edge);
+      // Copy into a tightly-sized buffer so IPC doesn't ship the whole recording.
+      const chunkPcm = new Float32Array(pcm.subarray(processedSamples, cut));
+      if (!chunkPcm.length) return;
+
+      const text = await window.electronAPI.transcribeAudio(chunkPcm);
+      if (text) liveTranscript += (liveTranscript ? ' ' : '') + text;
+      processedSamples = cut;
+    } catch (e) {
+      console.error('Live transcription chunk failed:', e);
+    } finally {
+      liveBusy = false;
+    }
+  })();
+  return liveOpPromise;
+}
+
+// Pick a cut point near maxIdx that falls on the quietest moment (likely a pause
+// between words), minimising mid-word splits at chunk seams. Searches the last
+// ~2s before the edge for the lowest-energy 30ms window.
+function findQuietCut(pcm, fromIdx, maxIdx) {
+  const searchStart = Math.max(fromIdx + SAMPLE_RATE, maxIdx - 2 * SAMPLE_RATE);
+  if (searchStart >= maxIdx) return maxIdx;
+  const winLen = Math.floor(SAMPLE_RATE * 0.03);
+  let bestIdx = maxIdx;
+  let bestEnergy = Infinity;
+  for (let i = searchStart; i + winLen <= maxIdx; i += winLen) {
+    let sum = 0;
+    for (let j = i; j < i + winLen; j++) sum += pcm[j] * pcm[j];
+    if (sum < bestEnergy) { bestEnergy = sum; bestIdx = i + (winLen >> 1); }
+  }
+  return bestIdx;
 }
 
 // Decode any captured audio and resample to the 16kHz mono PCM Whisper expects.

@@ -7,9 +7,14 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const MODEL_FILENAME = 'ggml-base.bin';
+
+// Use as many threads as the machine has logical cores (whisper.cpp otherwise
+// caps itself at 4), but always at least 1. This speeds up each transcribe call.
+const N_THREADS = Math.max(1, os.cpus().length);
 
 let whisper = null;       // resident Whisper instance
 let loadingPromise = null; // de-dupe concurrent loads
@@ -62,7 +67,9 @@ async function transcribePcm(pcm, app) {
     throw new Error('No audio captured');
   }
   const w = await getWhisper(app);
-  const task = await w.transcribe(pcm, { language: 'auto' });
+  // Fix the language to English (skips Whisper's language-detection pass) and
+  // use all available cores — both shave time off each transcription.
+  const task = await w.transcribe(pcm, { language: 'en', n_threads: N_THREADS });
   const result = await task.result;
   return result.map((segment) => segment.text).join('').trim();
 }
