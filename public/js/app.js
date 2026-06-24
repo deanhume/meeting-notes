@@ -990,16 +990,22 @@ let recordStartTime = 0;
 let isTranscribing = false;
 
 // Live (chunked) transcription state. While recording, audio is transcribed in
-// the background every LIVE_CHUNK_MS so that by the time the user hits Stop most
-// of the work is already done — only the final tail and the summary remain.
-let liveInterval = null;      // timer that kicks off background chunks
-let liveTranscript = '';      // running transcript assembled from chunks
+// the background every LIVE_CHUNK_MS and the resulting text is appended to a
+// transcript file in the data folder. Separately, every LIVE_SUMMARY_MS the file
+// is read back, summarised, and written into the note — giving the user a rolling,
+// real-time summary of the meeting rather than one produced only at Stop.
+let liveInterval = null;      // timer that kicks off background transcription chunks
+let summaryInterval = null;   // timer that re-summarises the transcript file
+let liveWordCount = 0;        // words transcribed so far (for the status line)
 let processedSamples = 0;     // 16kHz-sample cursor: audio already transcribed
 let liveBusy = false;         // a chunk transcription is in flight
 let liveOpPromise = null;     // resolves when the in-flight chunk finishes
+let liveSummaryText = '';     // summary block currently written into the note, so
+                              // it can be replaced in place as the summary grows
 
 const SAMPLE_RATE = 16000;
-const LIVE_CHUNK_MS = 20000;                       // attempt a chunk every 20s
+const LIVE_CHUNK_MS = 20000;                       // attempt a transcription chunk every 20s
+const LIVE_SUMMARY_MS = 30000;                     // re-summarise the transcript file every 30s
 const LIVE_MIN_CHUNK_SAMPLES = SAMPLE_RATE * 4;    // need ≥4s of new audio
 const LIVE_EDGE_GUARD_SAMPLES = SAMPLE_RATE * 0.8; // leave ~0.8s live edge unprocessed
 
@@ -1083,10 +1089,18 @@ async function startRecording() {
   }
 
   recordedChunks = [];
-  liveTranscript = '';
+  liveWordCount = 0;
+  liveSummaryText = '';
   processedSamples = 0;
   liveBusy = false;
   liveOpPromise = null;
+  // Start a fresh transcript file in the configured data folder. Transcribed
+  // audio is appended here in chunks and read back to build the live summary.
+  try {
+    await window.electronAPI.transcriptStart();
+  } catch (e) {
+    console.error('Could not start transcript file:', e);
+  }
   mediaRecorder = new MediaRecorder(recordStream);
   // A 1s timeslice makes data available regularly so the cumulative blob keeps
   // growing and can be transcribed mid-recording.
@@ -1102,13 +1116,14 @@ async function startRecording() {
   updateRecordTimer();
   recordTimerInterval = setInterval(updateRecordTimer, 1000);
   liveInterval = setInterval(() => { transcribeLiveChunk(false); }, LIVE_CHUNK_MS);
+  summaryInterval = setInterval(() => { refreshSummaryFromFile(); }, LIVE_SUMMARY_MS);
 }
 
 function updateRecordTimer() {
   const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
   const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
   const s = String(elapsed % 60).padStart(2, '0');
-  const live = liveTranscript ? ` · transcribing ${liveTranscript.split(/\s+/).filter(Boolean).length}w` : '';
+  const live = liveWordCount ? ` · transcribing ${liveWordCount}w` : '';
   setRecordStatus(`Recording ${m}:${s}${live}`);
   updateRecordWarning(elapsed);
 }
@@ -1157,6 +1172,10 @@ function cleanupRecordStream() {
     clearInterval(liveInterval);
     liveInterval = null;
   }
+  if (summaryInterval) {
+    clearInterval(summaryInterval);
+    summaryInterval = null;
+  }
 }
 
 async function handleRecordingStop() {
@@ -1179,14 +1198,9 @@ async function handleRecordingStop() {
     // …then transcribe everything still after the last cut (force = whole tail).
     await transcribeLiveChunk(true);
 
-    const text = liveTranscript.trim();
-    if (text) {
-      const summary = summarizeToBullets(text);
-      insertTranscript(summary);
-      setRecordStatus('Summarised');
-    } else {
-      setRecordStatus('No speech detected');
-    }
+    // Final pass: read the complete transcript file and summarise it.
+    const hadText = await refreshSummaryFromFile();
+    setRecordStatus(hadText ? 'Summarised' : 'No speech detected');
   } catch (e) {
     console.error('Transcription failed:', e);
     setRecordStatus('Transcription failed');
@@ -1224,8 +1238,17 @@ async function transcribeLiveChunk(force) {
       if (!chunkPcm.length) return;
 
       const text = await window.electronAPI.transcribeAudio(chunkPcm);
-      if (text) liveTranscript += (liveTranscript ? ' ' : '') + text;
       processedSamples = cut;
+      // Write the transcribed chunk to the transcript file (append, performant).
+      // The rolling summary is produced separately by refreshSummaryFromFile().
+      if (text) {
+        liveWordCount += text.split(/\s+/).filter(Boolean).length;
+        try {
+          await window.electronAPI.transcriptAppend(text);
+        } catch (e) {
+          console.error('Appending to transcript file failed:', e);
+        }
+      }
     } catch (e) {
       console.error('Live transcription chunk failed:', e);
     } finally {
@@ -1329,12 +1352,43 @@ function summarizeToBullets(transcript) {
   return top.map((o) => '- ' + tidySentence(o.s)).join('\n');
 }
 
-function insertTranscript(text) {
+// Read the transcript file written during recording, summarise it, and update the
+// note's summary block. Returns true if the file contained any transcribed text.
+// Called on a 30s timer for a real-time feel, and once more on Stop for a final pass.
+async function refreshSummaryFromFile() {
+  let transcript = '';
+  try {
+    transcript = (await window.electronAPI.transcriptRead()) || '';
+  } catch (e) {
+    console.error('Reading transcript file failed:', e);
+    return false;
+  }
+  transcript = transcript.trim();
+  if (!transcript) return false;
+  updateLiveSummary(transcript);
+  return true;
+}
+
+// Summarise the given transcript and write it into the note, keeping that same
+// block in sync as the transcript grows. The previously written summary is
+// replaced in place so the note reflects the whole meeting so far without piling
+// up duplicates. If the user has edited/removed the block, we append a fresh one.
+function updateLiveSummary(transcript) {
+  const text = (transcript || '').trim();
+  if (!text) return;
+  const summary = summarizeToBullets(text);
+  if (!summary) return;
+
   const textarea = document.getElementById('noteContentInput');
-  const existing = textarea.value;
-  const needsNewline = existing.length > 0 && !existing.endsWith('\n');
-  const prefix = existing.length === 0 ? '' : (needsNewline ? '\n\n' : '');
-  textarea.value = existing + prefix + text;
+  if (liveSummaryText && textarea.value.includes(liveSummaryText)) {
+    textarea.value = textarea.value.replace(liveSummaryText, summary);
+  } else {
+    const existing = textarea.value;
+    const needsNewline = existing.length > 0 && !existing.endsWith('\n');
+    const prefix = existing.length === 0 ? '' : (needsNewline ? '\n\n' : '');
+    textarea.value = existing + prefix + summary;
+  }
+  liveSummaryText = summary;
   textarea.dispatchEvent(new Event('input'));
   if (editingNoteId) autosaveNote();
 }

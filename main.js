@@ -6,6 +6,7 @@
 
 const { app, BrowserWindow, ipcMain, dialog, Menu, session, desktopCapturer } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const { autoUpdater } = require('electron-updater');
 const { safeLoadJSON, atomicWriteFile, createApiRoutes } = require('./shared');
@@ -146,6 +147,41 @@ ipcMain.handle('transcription-available', () => {
 // IPC handler: transcribe 16kHz mono PCM (Float32Array) to text, fully on-device
 ipcMain.handle('transcribe-audio', async (_event, pcm) => {
   return transcription.transcribePcm(pcm, app);
+});
+
+// Path of the transcript text file for the in-progress recording. The renderer
+// writes transcribed audio to this file in chunks (performant append) and reads
+// it back periodically to produce a live, rolling summary of the meeting.
+let currentTranscriptPath = null;
+
+// IPC handler: begin a new transcript file in the configured data folder and
+// return its filename. A fresh file is created per recording session.
+ipcMain.handle('transcript-start', () => {
+  const dir = loadSettings().dataLocation;
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  currentTranscriptPath = path.join(dir, `transcript_${stamp}.txt`);
+  fs.writeFileSync(currentTranscriptPath, '', 'utf8');
+  return path.basename(currentTranscriptPath);
+});
+
+// IPC handler: append a transcribed chunk to the current transcript file. Uses
+// a plain append (not atomic rewrite) so writing stays cheap as the file grows.
+// Each chunk is written on its own line and guaranteed to end with sentence
+// punctuation: the summariser splits on . ! ?, so a pause-cut chunk left without
+// terminal punctuation would otherwise merge with the next into a run-on sentence.
+ipcMain.handle('transcript-append', (_event, text) => {
+  if (!currentTranscriptPath || typeof text !== 'string' || !text.trim()) return false;
+  let chunk = text.trim();
+  if (!/[.!?]["')\]]?$/.test(chunk)) chunk += '.';
+  fs.appendFileSync(currentTranscriptPath, `${chunk}\n`, 'utf8');
+  return true;
+});
+
+// IPC handler: read back the full transcript text for the current recording.
+ipcMain.handle('transcript-read', () => {
+  if (!currentTranscriptPath || !fs.existsSync(currentTranscriptPath)) return '';
+  return fs.readFileSync(currentTranscriptPath, 'utf8');
 });
 
 // Electron lifecycle: wait for server to be ready before opening the window
