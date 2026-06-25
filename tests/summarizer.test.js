@@ -3,6 +3,9 @@ const {
   contentWords,
   tidySentence,
   splitSentences,
+  stripLeadingDiscourse,
+  collapseDisfluency,
+  splitRunOns,
   summarizeToBullets,
 } = require('../public/js/summarizer');
 
@@ -48,6 +51,60 @@ describe('splitSentences', () => {
       'second line',
       'third line',
     ]);
+  });
+});
+
+describe('stripLeadingDiscourse', () => {
+  test('removes a single leading discourse marker', () => {
+    expect(stripLeadingDiscourse('So we shipped the release.')).toBe('we shipped the release.');
+    expect(stripLeadingDiscourse('And then it broke.')).toBe('then it broke.');
+  });
+
+  test('removes stacked leading markers', () => {
+    expect(stripLeadingDiscourse('Okay, well, basically we are done.')).toBe('we are done.');
+  });
+
+  test('leaves substantive openings untouched', () => {
+    expect(stripLeadingDiscourse('Sarah owns the migration.')).toBe('Sarah owns the migration.');
+  });
+
+  test('falls back to the original when everything would be stripped', () => {
+    expect(stripLeadingDiscourse('So, well,')).toBe('So, well,');
+  });
+});
+
+describe('collapseDisfluency', () => {
+  test('collapses immediately repeated words (space or comma separated)', () => {
+    expect(collapseDisfluency('a high, high, high level')).toBe('a high level');
+    expect(collapseDisfluency('the the the plan')).toBe('the plan');
+  });
+
+  test('removes self-correction interjections', () => {
+    expect(collapseDisfluency('optimise your habit, excuse me, your app')).toBe('optimise your habit, your app');
+  });
+
+  test('leaves clean text unchanged', () => {
+    expect(collapseDisfluency('we agreed to delay the launch')).toBe('we agreed to delay the launch');
+  });
+});
+
+describe('splitRunOns', () => {
+  test('leaves short sentences intact', () => {
+    const s = 'We agreed to delay the launch by a week.';
+    expect(splitRunOns(s)).toEqual([s]);
+  });
+
+  test('splits a long run-on at a strong discourse boundary', () => {
+    const s = 'The migration is the use case we found best fits gaming and academic work, ' +
+      'but at a high level there are many reasons developers lean towards local AI optimisation today';
+    const parts = splitRunOns(s);
+    expect(parts.length).toBe(2);
+    expect(parts[1].startsWith('but')).toBe(true);
+  });
+
+  test('keeps the whole sentence when a split would create a tiny fragment', () => {
+    const s = 'This is a fairly long sentence about the roadmap and the budget review and the hiring plan for the next quarter and well beyond that, but no.';
+    expect(splitRunOns(s)).toEqual([s]);
   });
 });
 

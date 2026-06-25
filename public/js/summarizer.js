@@ -68,6 +68,69 @@ function splitSentences(text) {
     .filter(Boolean);
 }
 
+// Discourse markers / fillers that add nothing at the START of a bullet
+// ("So…", "And…", "Okay, well…", "I mean…"). Stripped so bullets open on substance.
+const LEADING_DISCOURSE = /^(?:so|and|but|now|okay|ok|well|yeah|yes|right|like|i mean|you know|basically|actually|anyway|um+|uh+|oh|see|alright|right then)[\s,]+/i;
+
+// Self-correction / hedging interjections dropped from the middle of a sentence.
+const SELF_CORRECTION = /\b(?:sorry|excuse me|i mean|or rather|you know)\b\s*,?/gi;
+
+// Remove a leading run of discourse markers (handles stacked ones like
+// "So basically, well,"). Falls back to the original if everything is stripped.
+function stripLeadingDiscourse(s) {
+  let out = s.trim();
+  let prev;
+  do {
+    prev = out;
+    out = out.replace(LEADING_DISCOURSE, '').trim();
+  } while (out !== prev && out);
+  return out || s.trim();
+}
+
+// Collapse spoken disfluency the transcript leaks into a chosen sentence:
+// immediately repeated words ("high, high, high" -> "high") and self-corrections
+// ("…optimising your habit, excuse me, your app…" -> "…optimising your habit your app…"),
+// then tidy the leftover spacing/commas.
+function collapseDisfluency(s) {
+  let out = s;
+  let prev;
+  do {
+    prev = out;
+    out = out.replace(/\b([\w']+)(?:[\s,]+\1\b)+/gi, '$1');
+  } while (out !== prev);
+  out = out.replace(SELF_CORRECTION, ' ');
+  return out
+    .replace(/\s+,/g, ',')
+    .replace(/,(?:\s*,)+/g, ',')
+    .replace(/\s+([.!?;:])/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^[\s,]+/, '')
+    .trim();
+}
+
+// Clean a chosen sentence for display/ranking: collapse disfluency, then strip
+// any leading discourse marker left at the front.
+function cleanForSummary(s) {
+  return stripLeadingDiscourse(collapseDisfluency(s));
+}
+
+// Split a long run-on sentence into tighter clause units at strong internal
+// discourse boundaries (", so", ", but", ", now"…), so the ranker scores compact
+// ideas instead of one sprawling sentence. Only applied to long sentences, and
+// only kept when every resulting part is itself substantial — otherwise the whole
+// sentence is preserved (we never emit tiny fragments).
+function splitRunOns(sentence) {
+  if (summaryWords(sentence).length <= 25) return [sentence];
+  const parts = sentence
+    .split(/[,;]\s+(?=(?:so|but|now|because|which is why|and then|so then)\b)/i)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length > 1 && parts.every((p) => summaryWords(p).length >= 6)) {
+    return parts;
+  }
+  return [sentence];
+}
+
 // Jaccard similarity of two content-word sets (0..1). Used for MMR de-duplication.
 function jaccard(aSet, bSet) {
   if (aSet.size === 0 || bSet.size === 0) return 0;
@@ -169,11 +232,16 @@ function summarizeToBullets(transcript) {
   const clean = (transcript || '').replace(/[ \t]+/g, ' ').trim();
   if (!clean) return '';
 
-  const all = splitSentences(clean).filter((s) => summaryWords(s).length >= 3);
+  // Split into sentences, break long run-ons into tighter clause units, then
+  // clean spoken disfluency / leading discourse markers from each candidate.
+  const all = splitSentences(clean)
+    .flatMap(splitRunOns)
+    .map(cleanForSummary)
+    .filter((s) => summaryWords(s).length >= 3);
 
   // Nothing rankable — bullet the whole thing as-is.
   if (all.length <= 1) {
-    return '- ' + tidySentence(clean);
+    return '- ' + tidySentence(cleanForSummary(clean));
   }
 
   // Drop pure navigation chatter, but only while enough real content survives;
@@ -238,6 +306,10 @@ if (typeof module !== 'undefined' && module.exports) {
     contentWords,
     tidySentence,
     splitSentences,
+    stripLeadingDiscourse,
+    collapseDisfluency,
+    cleanForSummary,
+    splitRunOns,
     summarizeToBullets,
   };
 }
