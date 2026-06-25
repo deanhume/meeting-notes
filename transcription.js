@@ -12,9 +12,20 @@ const path = require('path');
 
 const MODEL_FILENAME = 'ggml-base.bin';
 
-// Use as many threads as the machine has logical cores (whisper.cpp otherwise
-// caps itself at 4), but always at least 1. This speeds up each transcribe call.
-const N_THREADS = Math.max(1, os.cpus().length);
+// Pick a thread count that keeps each transcribe call fast WITHOUT pinning the
+// whole machine. Using every logical core (whisper.cpp's behaviour when given
+// os.cpus().length) drives the CPU to ~100% and, because of hyper-thread
+// contention, yields little speed-up past the physical core count anyway.
+//
+// Thread count changes only throughput, never the decoded output (results are
+// deterministic for a given audio buffer), so leaving headroom does not affect
+// transcription accuracy. We target ~75% of logical cores and always leave at
+// least one core free for the UI / OS, with a floor of 1 thread.
+const LOGICAL_CORES = Math.max(1, os.cpus().length);
+const N_THREADS = Math.max(
+  1,
+  Math.min(LOGICAL_CORES - 1, Math.round(LOGICAL_CORES * 0.75))
+);
 
 let whisper = null;       // resident Whisper instance
 let loadingPromise = null; // de-dupe concurrent loads
