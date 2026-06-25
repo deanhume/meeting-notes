@@ -991,21 +991,17 @@ let isTranscribing = false;
 
 // Live (chunked) transcription state. While recording, audio is transcribed in
 // the background every LIVE_CHUNK_MS and the resulting text is appended to a
-// transcript file in the data folder. Separately, every LIVE_SUMMARY_MS the file
-// is read back, summarised, and written into the note — giving the user a rolling,
-// real-time summary of the meeting rather than one produced only at Stop.
+// transcript file in the data folder. The transcript is only read back and
+// summarised into the note once, when the user presses Stop (handleRecordingStop).
 let liveInterval = null;      // timer that kicks off background transcription chunks
-let summaryInterval = null;   // timer that re-summarises the transcript file
 let liveWordCount = 0;        // words transcribed so far (for the status line)
 let processedSamples = 0;     // 16kHz-sample cursor: audio already transcribed
 let liveBusy = false;         // a chunk transcription is in flight
 let liveOpPromise = null;     // resolves when the in-flight chunk finishes
-let liveSummaryText = '';     // summary block currently written into the note, so
-                              // it can be replaced in place as the summary grows
+let liveSummaryText = '';     // summary block written into the note at Stop
 
 const SAMPLE_RATE = 16000;
 const LIVE_CHUNK_MS = 20000;                       // attempt a transcription chunk every 20s
-const LIVE_SUMMARY_MS = 30000;                     // re-summarise the transcript file every 30s
 const LIVE_MIN_CHUNK_SAMPLES = SAMPLE_RATE * 4;    // need ≥4s of new audio
 const LIVE_EDGE_GUARD_SAMPLES = SAMPLE_RATE * 0.8; // leave ~0.8s live edge unprocessed
 
@@ -1028,7 +1024,6 @@ async function wireRecordButton() {
     return;
   }
   btn.classList.remove('hidden');
-  document.getElementById('recordSource').classList.remove('hidden');
   btn.addEventListener('click', toggleRecording);
 }
 
@@ -1076,7 +1071,8 @@ async function buildCaptureStream(mode) {
 }
 
 async function startRecording() {
-  const mode = document.getElementById('recordSource').value;
+  // Always record mic + system audio mixed into one stream.
+  const mode = 'both';
   recordSources = [];
   mixContext = null;
   try {
@@ -1084,7 +1080,7 @@ async function startRecording() {
   } catch (e) {
     console.error('Capture failed:', e);
     cleanupRecordStream();
-    setRecordStatus(mode === 'mic' ? 'Microphone access denied' : 'Audio capture unavailable');
+    setRecordStatus('Audio capture unavailable');
     return;
   }
 
@@ -1108,15 +1104,15 @@ async function startRecording() {
   mediaRecorder.onstop = handleRecordingStop;
   mediaRecorder.start(1000);
 
-  document.getElementById('recordSource').disabled = true;
   const btn = document.getElementById('recordBtn');
   btn.classList.add('recording');
   document.getElementById('recordBtnLabel').textContent = 'Stop';
   recordStartTime = Date.now();
   updateRecordTimer();
   recordTimerInterval = setInterval(updateRecordTimer, 1000);
+  // Transcribe audio to the transcript file in the background while recording, but
+  // only summarise it into the note once the user presses Stop (see handleRecordingStop).
   liveInterval = setInterval(() => { transcribeLiveChunk(false); }, LIVE_CHUNK_MS);
-  summaryInterval = setInterval(() => { refreshSummaryFromFile(); }, LIVE_SUMMARY_MS);
 }
 
 function updateRecordTimer() {
@@ -1172,10 +1168,6 @@ function cleanupRecordStream() {
     clearInterval(liveInterval);
     liveInterval = null;
   }
-  if (summaryInterval) {
-    clearInterval(summaryInterval);
-    summaryInterval = null;
-  }
 }
 
 async function handleRecordingStop() {
@@ -1208,7 +1200,6 @@ async function handleRecordingStop() {
     isTranscribing = false;
     btn.classList.remove('transcribing');
     btn.disabled = false;
-    document.getElementById('recordSource').disabled = false;
     setTimeout(() => {
       const recording = mediaRecorder && mediaRecorder.state === 'recording';
       if (!isTranscribing && !recording) setRecordStatus('');

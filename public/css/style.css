@@ -739,22 +739,6 @@ body.light-theme .theme-toggle-thumb {
   margin-left: 4px;
 }
 
-.record-source {
-  background: var(--surface);
-  color: var(--text-mid);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  padding: 3px 4px;
-  cursor: pointer;
-}
-
-.record-source:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .record-warning {
   font-size: 12px;
   font-weight: 600;

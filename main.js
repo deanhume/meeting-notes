@@ -154,10 +154,11 @@ ipcMain.handle('transcribe-audio', async (_event, pcm) => {
 // it back periodically to produce a live, rolling summary of the meeting.
 let currentTranscriptPath = null;
 
-// IPC handler: begin a new transcript file in the configured data folder and
-// return its filename. A fresh file is created per recording session.
+// IPC handler: begin a new transcript file in a "transcriptions" subfolder of the
+// configured data folder and return its filename. A fresh file is created per
+// recording session, and the subfolder is created on demand if it doesn't exist.
 ipcMain.handle('transcript-start', () => {
-  const dir = loadSettings().dataLocation;
+  const dir = path.join(loadSettings().dataLocation, 'transcriptions');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   currentTranscriptPath = path.join(dir, `transcript_${stamp}.txt`);
