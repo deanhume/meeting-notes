@@ -65,3 +65,11 @@ Add the route inside `createApiRoutes` in `shared.js`: load with `safeLoadJSON`,
 ## Docs
 
 See `docs/` for deeper guides: `DEVELOPMENT.md`, `BUILDING.md`, `USAGE.md`, `AUTO_UPDATES.md`, `RELEASE_CHECKLIST.md`. Note `package.json` currently only defines Windows build scripts despite mac references in some docs.
+
+## Rejected approaches (do not re-propose)
+
+- **Windows AI / Copilot+ on-device summarisation** (`@microsoft/windows-ai-electron`, Phi Silica `TextSummarizer.SummarizeConversationAsync`). This was prototyped and deliberately **rejected** — do **not** suggest or re-implement it unless the maintainer explicitly asks. Reasons:
+  - **Too few Copilot+ PCs to be worth it.** The feature only runs on Copilot+ hardware (40+ TOPS NPU: Snapdragon X, Intel Core Ultra 200V, AMD Ryzen AI 300). The vast majority of users would never hit the AI path, so it adds complexity for little real-world benefit. *(User decision, 2026-06-26: "There aren't enough copilot+ pcs to make this viable… too complex for the app's needs.")*
+  - **Heavy packaging cost.** Activating it requires **package identity** (the default NSIS installer is identity-less), pulling in `@microsoft/winappcli`, an `appxmanifest` with the `systemAIModels` capability, a separate signed **MSIX** build target, and code-signing — none of which the app otherwise needs.
+  - **Conflicts with auto-update.** MSIX uses a different update mechanism than the app's existing `electron-updater` + GitHub Releases flow, so it can't cleanly replace the primary distribution channel.
+  - The bundled **extractive summariser** (`public/js/summarizer.js`) already covers the meeting-summary need on all hardware with no extra dependencies — prefer extending it over reaching for on-device LLM APIs.
