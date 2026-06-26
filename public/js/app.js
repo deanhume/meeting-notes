@@ -1311,17 +1311,18 @@ function updateLiveSummary(transcript) {
   if (!text) return;
   const summary = summarizeToBullets(text);
   if (!summary) return;
+  const block = `--- 📝 Meeting Summary 📝 ---\n${summary}`;
 
   const textarea = document.getElementById('noteContentInput');
   if (liveSummaryText && textarea.value.includes(liveSummaryText)) {
-    textarea.value = textarea.value.replace(liveSummaryText, summary);
+    textarea.value = textarea.value.replace(liveSummaryText, block);
   } else {
     const existing = textarea.value;
     const needsNewline = existing.length > 0 && !existing.endsWith('\n');
     const prefix = existing.length === 0 ? '' : (needsNewline ? '\n\n' : '');
-    textarea.value = existing + prefix + summary;
+    textarea.value = existing + prefix + block;
   }
-  liveSummaryText = summary;
+  liveSummaryText = block;
   textarea.dispatchEvent(new Event('input'));
   if (editingNoteId) autosaveNote();
 }

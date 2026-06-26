@@ -31,8 +31,9 @@ The core design is a **single API route factory shared by two hosts**:
 - `preload.js` is the IPC bridge; the renderer runs with `nodeIntegration: false` and `contextIsolation: true`, so only explicitly exposed APIs reach the frontend. It exposes exactly `window.electronAPI.{selectFolder, transcriptionAvailable, transcribeAudio}` via `contextBridge` — add any new renderer↔main capability here plus a matching `ipcMain.handle` in `main.js`.
 - `transcription.js` (Electron main process only) wraps `smart-whisper` (whisper.cpp) for fully on-device speech-to-text. The Whisper model is loaded lazily on first use and kept resident. Voice/transcription is Electron-only — it is **not** available in web mode.
 - `public/js/app.js` is all frontend logic (DOM manipulation, `fetch` calls, theme, modals). `public/css/style.css` holds theming via CSS custom properties.
+- `public/js/summarizer.js` turns a raw transcript into bullet points using a fully on-device **extractive** algorithm (sentence cleanup + TextRank-style similarity scoring + signal boosting) — no LLM, no network. It is a **dual-mode module**: it attaches to `window` for the browser and also `module.exports` its functions (guarded by `typeof module !== 'undefined'`) so it can be unit-tested in Node without a browser. Keep this dual export when editing.
 
-When changing API behavior, edit `shared.js` once — both Electron and web mode inherit it. Tests in `tests/api.test.js` exercise `createApiRoutes` against a temp `dataDir`, and `tests/shared.test.js` covers the helpers — so no Electron is needed to test the API or persistence layer.
+When changing API behavior, edit `shared.js` once — both Electron and web mode inherit it. Tests in `tests/api.test.js` exercise `createApiRoutes` against a temp `dataDir`, and `tests/shared.test.js` covers the helpers — so no Electron is needed to test the API or persistence layer. `tests/summarizer.test.js` and `tests/transcription.test.js` cover the summarization and transcription helpers directly via their CommonJS exports.
 
 ## Data model
 
@@ -54,7 +55,7 @@ Key API surface: `/api/people`, `/api/people/:id/notes`, `/api/questions`, `/api
 - **HTTP**: 200/201 success, 400 validation (`{ error: "message" }`), 404 not found.
 - **Cascading delete**: deleting a person must remove their `notes_<id>.json` file.
 - **No async/await** in the persistence layer — file I/O is synchronous by design. (Transcription in `transcription.js` is the exception: it is async because Whisper is.)
-- **Voice transcription**: audio is captured in the renderer, downsampled to 16kHz mono Float32 PCM, and sent via `transcribeAudio` IPC; transcription runs on-device and never leaves the machine. The Record button stays hidden until `transcriptionAvailable` reports the model (`models/ggml-base.bin`) is present.
+- **Voice transcription**: audio is captured in the renderer, downsampled to 16kHz mono Float32 PCM, and sent via `transcribeAudio` IPC; transcription runs on-device and never leaves the machine. The resulting transcript can be condensed into bullet points by `summarizeToBullets` in `public/js/summarizer.js` (also on-device). The Record button stays hidden until `transcriptionAvailable` reports the model (`models/ggml-base.bin`) is present.
 - **Frontend**: vanilla JS only; modal-based create/edit; toggle visibility with the `hidden` class; persist UI prefs (theme) in `localStorage`; notes shown newest-first; autosave fires every 20 keystrokes.
 
 ## Adding an endpoint
