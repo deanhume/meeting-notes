@@ -607,6 +607,10 @@ function openEditNote(noteId) {
 }
 
 async function saveOnModalClose() {
+  // If a recording is still running, stop it and wait for the transcript to be
+  // summarised into the note first — otherwise the in-progress summary is lost.
+  await finalizeRecordingIfActive();
+
   const content = document.getElementById('noteContentInput').value.trim();
   if (!content) {
     closeNoteModal();
@@ -630,6 +634,10 @@ function closeNoteModal() {
 }
 
 async function saveNoteModal() {
+  // A recording may still be capturing when the user hits Ctrl/Cmd+Enter; finalise
+  // it so the summary lands in the note before we read the content below.
+  await finalizeRecordingIfActive();
+
   const title = document.getElementById('noteTitleInput').value.trim();
   const content = document.getElementById('noteContentInput').value.trim();
   const tags = [...currentTags];
@@ -824,11 +832,9 @@ function wireEvents() {
   document.getElementById('noteModalClose').addEventListener('click', saveOnModalClose);
   document.getElementById('noteModalCancel').addEventListener('click', saveOnModalClose);
   document.getElementById('noteModalSave').addEventListener('click', saveNoteModal);
-  document.getElementById('noteModal').addEventListener('click', async e => {
-    if (e.target === document.getElementById('noteModal')) {
-      await saveOnModalClose();
-    }
-  });
+  // The note modal is intentionally NOT dismissed by clicking the backdrop: a
+  // recording/transcription may be in progress, so it must be closed via an
+  // explicit action (the ✕ button, Cancel, Save, or Escape).
 
   // Note editor tabs (Write / Preview)
   document.getElementById('noteTabWrite').addEventListener('click', () => switchNoteTab('write'));
@@ -1000,6 +1006,7 @@ let processedSamples = 0;     // 16kHz-sample cursor: audio already transcribed
 let liveBusy = false;         // a chunk transcription is in flight
 let liveOpPromise = null;     // resolves when the in-flight chunk finishes
 let liveSummaryText = '';     // summary block written into the note at Stop
+let recordingStopWaiters = []; // resolved when handleRecordingStop has fully finished
 
 const SAMPLE_RATE = 16000;
 // Transcribe in the background frequently while recording so most of the audio is
@@ -1171,6 +1178,34 @@ function stopRecording() {
   if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
 }
 
+// Resolve anyone awaiting the end of a recording (e.g. a modal close that needs the
+// final summary written into the note before saving). Always called on every exit
+// path of handleRecordingStop so awaiters never hang.
+function resolveStopWaiters() {
+  const waiters = recordingStopWaiters;
+  recordingStopWaiters = [];
+  waiters.forEach((resolve) => resolve());
+}
+
+// If a recording (or its post-stop transcription) is in progress, stop it and wait
+// for handleRecordingStop to finish — which transcribes the tail and writes the
+// summary into the note textarea. Returns once the note content is finalised, so
+// callers can then save/close without losing the in-progress summary. No-op when
+// nothing is recording.
+async function finalizeRecordingIfActive() {
+  // Capture might still be mid-setup (click → stream ready); let it settle first.
+  while (isStarting) await new Promise((r) => setTimeout(r, 50));
+
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    const done = new Promise((resolve) => recordingStopWaiters.push(resolve));
+    stopRecording(); // fires onstop → handleRecordingStop (async)
+    await done;
+  } else if (isTranscribing) {
+    // Stop was already pressed and the final pass is running — wait for it.
+    await new Promise((resolve) => recordingStopWaiters.push(resolve));
+  }
+}
+
 function cleanupRecordStream() {
   recordSources.forEach((s) => s.getTracks().forEach((t) => t.stop()));
   recordSources = [];
@@ -1196,7 +1231,7 @@ async function handleRecordingStop() {
   clearRecordWarning();
   cleanupRecordStream(); // also stops the live-chunk interval
 
-  if (!recordedChunks.length) { setRecordStatus(''); return; }
+  if (!recordedChunks.length) { setRecordStatus(''); resolveStopWaiters(); return; }
 
   isTranscribing = true;
   btn.classList.add('transcribing');
@@ -1219,6 +1254,7 @@ async function handleRecordingStop() {
     isTranscribing = false;
     btn.classList.remove('transcribing');
     btn.disabled = false;
+    resolveStopWaiters(); // unblock any pending modal-close finalisation
     setTimeout(() => {
       const recording = mediaRecorder && mediaRecorder.state === 'recording';
       if (!isTranscribing && !recording) setRecordStatus('');
