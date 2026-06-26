@@ -744,7 +744,7 @@ function getUpdateStatusViewModel(status, isDesktopApp) {
   };
 }
 
-function supportsDesktopUpdateChecks() {
+function isUpdateCheckAvailable() {
   return !!(window.electronAPI &&
     window.electronAPI.checkForUpdates &&
     window.electronAPI.getUpdateStatus);
@@ -758,14 +758,14 @@ function stopUpdateStatusPolling() {
 }
 
 function renderUpdateStatus(status) {
-  const viewModel = getUpdateStatusViewModel(status, supportsDesktopUpdateChecks());
+  const viewModel = getUpdateStatusViewModel(status, isUpdateCheckAvailable());
   document.getElementById('checkUpdatesBtn').textContent = viewModel.buttonText;
   document.getElementById('checkUpdatesBtn').disabled = viewModel.buttonDisabled;
   document.getElementById('updateStatusLabel').textContent = viewModel.statusText;
 }
 
 async function refreshUpdateStatus() {
-  if (!supportsDesktopUpdateChecks()) {
+  if (!isUpdateCheckAvailable()) {
     renderUpdateStatus(null);
     return;
   }
@@ -780,12 +780,12 @@ async function refreshUpdateStatus() {
 
 function startUpdateStatusPolling() {
   stopUpdateStatusPolling();
-  if (!supportsDesktopUpdateChecks()) return;
+  if (!isUpdateCheckAvailable()) return;
   updateStatusPoller = setInterval(() => {
     if (!document.getElementById('settingsModal').classList.contains('hidden')) {
       refreshUpdateStatus();
     }
-  }, 1000);
+  }, 2000);
 }
 
 async function openSettings() {
@@ -837,7 +837,7 @@ async function saveSettingsModal() {
 }
 
 async function checkForUpdatesFromSettings() {
-  if (!supportsDesktopUpdateChecks()) {
+  if (!isUpdateCheckAvailable()) {
     renderUpdateStatus(null);
     return;
   }
