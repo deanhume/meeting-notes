@@ -197,13 +197,21 @@ app.whenReady().then(async () => {
   // Grant system-audio (loopback) capture for getDisplayMedia, so meetings/videos
   // playing on the machine can be transcribed. Windows uses WASAPI loopback.
   session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
-    desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
+    // Use a 1x1 thumbnail to skip the expensive full-screen screenshot of every
+    // display — we only use sources[0] as the loopback source id, never its
+    // thumbnail, so full-size thumbnails just add startup latency. (A 0x0 size is
+    // avoided as some platforms reject it.)
+    desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1, height: 1 } }).then((sources) => {
       if (!sources.length) {
+        console.error('No screen sources available for loopback capture');
         callback();
         return;
       }
       callback({ video: sources[0], audio: 'loopback' });
-    }).catch(() => callback());
+    }).catch((err) => {
+      console.error('desktopCapturer.getSources failed:', err);
+      callback();
+    });
   });
 
   createWindow();

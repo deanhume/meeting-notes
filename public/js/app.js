@@ -988,6 +988,7 @@ let recordStream = null;  // audio-only stream fed to MediaRecorder
 let recordTimerInterval = null;
 let recordStartTime = 0;
 let isTranscribing = false;
+let isStarting = false;       // true during async capture setup (click → stream ready)
 
 // Live (chunked) transcription state. While recording, audio is transcribed in
 // the background every LIVE_CHUNK_MS and the resulting text is appended to a
@@ -1001,8 +1002,13 @@ let liveOpPromise = null;     // resolves when the in-flight chunk finishes
 let liveSummaryText = '';     // summary block written into the note at Stop
 
 const SAMPLE_RATE = 16000;
-const LIVE_CHUNK_MS = 20000;                       // attempt a transcription chunk every 20s
-const LIVE_MIN_CHUNK_SAMPLES = SAMPLE_RATE * 4;    // need ≥4s of new audio
+// Transcribe in the background frequently while recording so most of the audio is
+// already done by the time the user presses Stop — only a short tail then remains,
+// making "Finishing transcription" feel near-instant for longer recordings. The
+// liveBusy guard self-throttles: ticks that land while a transcription is still in
+// flight are skipped, so a small interval never queues up overlapping work.
+const LIVE_CHUNK_MS = 5000;                        // attempt a transcription chunk every 5s
+const LIVE_MIN_CHUNK_SAMPLES = SAMPLE_RATE * 2;    // need ≥2s of new audio
 const LIVE_EDGE_GUARD_SAMPLES = SAMPLE_RATE * 0.8; // leave ~0.8s live edge unprocessed
 
 // Recording-duration thresholds (seconds): warn near, then past, ~15 min.
@@ -1032,7 +1038,7 @@ function setRecordStatus(text) {
 }
 
 async function toggleRecording() {
-  if (isTranscribing) return;
+  if (isTranscribing || isStarting) return;
   if (mediaRecorder && mediaRecorder.state === 'recording') {
     stopRecording();
   } else {
@@ -1071,6 +1077,17 @@ async function buildCaptureStream(mode) {
 }
 
 async function startRecording() {
+  // Give immediate feedback: capture setup (mic + system-audio loopback) takes a
+  // moment, so reflect "starting" on the button/status the instant it's clicked
+  // rather than only once the stream is ready. isStarting blocks a second click
+  // during this window (the button already reads "Stop" but mediaRecorder isn't
+  // live yet, so toggleRecording would otherwise start a duplicate capture).
+  isStarting = true;
+  const btn = document.getElementById('recordBtn');
+  btn.classList.add('recording');
+  document.getElementById('recordBtnLabel').textContent = 'Stop';
+  setRecordStatus('Starting…');
+
   // Always record mic + system audio mixed into one stream.
   const mode = 'both';
   recordSources = [];
@@ -1080,7 +1097,10 @@ async function startRecording() {
   } catch (e) {
     console.error('Capture failed:', e);
     cleanupRecordStream();
-    setRecordStatus('Audio capture unavailable');
+    btn.classList.remove('recording');
+    document.getElementById('recordBtnLabel').textContent = 'Record';
+    setRecordStatus(`Audio capture unavailable: ${e.name || ''} ${e.message || e}`.trim());
+    isStarting = false;
     return;
   }
 
@@ -1104,9 +1124,8 @@ async function startRecording() {
   mediaRecorder.onstop = handleRecordingStop;
   mediaRecorder.start(1000);
 
-  const btn = document.getElementById('recordBtn');
-  btn.classList.add('recording');
-  document.getElementById('recordBtnLabel').textContent = 'Stop';
+  // Capture is live now; updateRecordTimer replaces "Starting…" with the timer.
+  isStarting = false;
   recordStartTime = Date.now();
   updateRecordTimer();
   recordTimerInterval = setInterval(updateRecordTimer, 1000);
