@@ -27,6 +27,19 @@ Download the latest release from the [Releases page](https://github.com/deanhume
 
 Updates are delivered automatically after install.
 
+#### "Windows protected your PC" warning
+
+On first install you may see a blue **"Windows protected your PC"** dialog (Microsoft Defender SmartScreen) describing Meeting Notes as an *unrecognised app*. This appears because the installer is signed with a self-signed certificate rather than one from a paid certificate authority — Windows can't verify the publisher, so it warns you. It is expected and **not** a sign that the app is unsafe, and it normally only shows on the first install on each machine.
+
+To continue:
+
+1. Click the **More info** link (small text under the message).
+2. Click the **Run anyway** button that appears, then follow the installer.
+
+If your browser blocks the download first (e.g. Edge/Chrome says it "can't be downloaded securely"), open the browser's **Downloads** list, find the file, and choose **Keep** / **Keep anyway**. You can also right-click the downloaded `.exe` → **Properties** and tick **Unblock** (if shown) before running it.
+
+> If there is no **More info** link, SmartScreen is set to *block* rather than *warn* (an administrator policy), which only an admin can change.
+
 ### Develop
 
 ```bash
