@@ -707,6 +707,86 @@ async function saveQuestionsModal() {
 
 /* ── Settings Modal ───────────────────────────────────────── */
 let pendingDataLocation = null;
+let updateStatusPoller = null;
+
+function getUpdateStatusViewModel(status, isDesktopApp) {
+  if (!isDesktopApp) {
+    return {
+      buttonText: 'Check for updates',
+      buttonDisabled: true,
+      statusText: 'Update checks are only available in the desktop app.'
+    };
+  }
+
+  const state = status && status.state ? status.state : 'idle';
+  const message = status && status.message ? status.message : '';
+
+  if (state === 'checking') {
+    return {
+      buttonText: 'Checking…',
+      buttonDisabled: true,
+      statusText: message || 'Checking for updates…'
+    };
+  }
+
+  if (state === 'downloading') {
+    return {
+      buttonText: 'Downloading…',
+      buttonDisabled: true,
+      statusText: message || 'Downloading the latest update in the background. You can continue working.'
+    };
+  }
+
+  return {
+    buttonText: 'Check for updates',
+    buttonDisabled: false,
+    statusText: message
+  };
+}
+
+function supportsDesktopUpdateChecks() {
+  return !!(window.electronAPI &&
+    window.electronAPI.checkForUpdates &&
+    window.electronAPI.getUpdateStatus);
+}
+
+function stopUpdateStatusPolling() {
+  if (updateStatusPoller) {
+    clearInterval(updateStatusPoller);
+    updateStatusPoller = null;
+  }
+}
+
+function renderUpdateStatus(status) {
+  const viewModel = getUpdateStatusViewModel(status, supportsDesktopUpdateChecks());
+  document.getElementById('checkUpdatesBtn').textContent = viewModel.buttonText;
+  document.getElementById('checkUpdatesBtn').disabled = viewModel.buttonDisabled;
+  document.getElementById('updateStatusLabel').textContent = viewModel.statusText;
+}
+
+async function refreshUpdateStatus() {
+  if (!supportsDesktopUpdateChecks()) {
+    renderUpdateStatus(null);
+    return;
+  }
+
+  try {
+    const status = await window.electronAPI.getUpdateStatus();
+    renderUpdateStatus(status);
+  } catch (e) {
+    renderUpdateStatus({ state: 'error', message: e.message || 'Unable to load update status.' });
+  }
+}
+
+function startUpdateStatusPolling() {
+  stopUpdateStatusPolling();
+  if (!supportsDesktopUpdateChecks()) return;
+  updateStatusPoller = setInterval(() => {
+    if (!document.getElementById('settingsModal').classList.contains('hidden')) {
+      refreshUpdateStatus();
+    }
+  }, 1000);
+}
 
 async function openSettings() {
   try {
@@ -715,6 +795,8 @@ async function openSettings() {
     document.getElementById('dataLocationNote').textContent = `Current: ${settings.dataLocation}`;
     pendingDataLocation = settings.dataLocation;
     document.getElementById('settingsModal').classList.remove('hidden');
+    await refreshUpdateStatus();
+    startUpdateStatusPolling();
   } catch (e) {
     showError(e.message);
   }
@@ -723,6 +805,7 @@ async function openSettings() {
 function closeSettingsModal() {
   document.getElementById('settingsModal').classList.add('hidden');
   pendingDataLocation = null;
+  stopUpdateStatusPolling();
 }
 
 async function selectFolder() {
@@ -750,6 +833,22 @@ async function saveSettingsModal() {
     window.location.reload();
   } catch (e) {
     showError(e.message);
+  }
+}
+
+async function checkForUpdatesFromSettings() {
+  if (!supportsDesktopUpdateChecks()) {
+    renderUpdateStatus(null);
+    return;
+  }
+
+  renderUpdateStatus({ state: 'checking', message: 'Checking for updates…' });
+
+  try {
+    const status = await window.electronAPI.checkForUpdates();
+    renderUpdateStatus(status);
+  } catch (e) {
+    renderUpdateStatus({ state: 'error', message: e.message || 'Unable to check for updates right now.' });
   }
 }
 
@@ -863,6 +962,7 @@ function wireEvents() {
   document.getElementById('settingsModalCancel').addEventListener('click', closeSettingsModal);
   document.getElementById('settingsModalSave').addEventListener('click', saveSettingsModal);
   document.getElementById('selectFolderBtn').addEventListener('click', selectFolder);
+  document.getElementById('checkUpdatesBtn').addEventListener('click', checkForUpdatesFromSettings);
   document.getElementById('settingsModal').addEventListener('click', e => {
     if (e.target === document.getElementById('settingsModal')) closeSettingsModal();
   });
@@ -1411,4 +1511,12 @@ async function loadVersion() {
   }
 }
 
-init();
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    getUpdateStatusViewModel
+  };
+}
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  init();
+}

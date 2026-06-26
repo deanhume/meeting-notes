@@ -1256,6 +1256,15 @@ body.light-theme .icon-refresh {
   margin: 0;
 }
 
+.settings-update-btn {
+  margin-top: 8px;
+}
+
+.settings-update-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 /* ── Dashboard Button ─────────────────────────────────────── */
 .dashboard-btn {
   margin: 6px 14px 10px;
