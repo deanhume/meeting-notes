@@ -209,6 +209,106 @@ describe('Dashboard API', () => {
   });
 });
 
+// ── Search API ───────────────────────────────────────────────
+
+describe('Search API', () => {
+  let personId;
+
+  beforeEach(async () => {
+    const person = await request(app).post('/api/people').send({ name: 'Alice Smith', role: 'Engineer', team: 'Platform' });
+    personId = person.body.id;
+  });
+
+  test('GET /api/search returns 400 without query', async () => {
+    const res = await request(app).get('/api/search');
+    expect(res.status).toBe(400);
+  });
+
+  test('GET /api/search returns 400 for empty query', async () => {
+    const res = await request(app).get('/api/search?q=');
+    expect(res.status).toBe(400);
+  });
+
+  test('GET /api/search finds notes by content', async () => {
+    await request(app).post(`/api/people/${personId}/notes`).send({ content: 'Discussed quarterly planning' });
+    await request(app).post(`/api/people/${personId}/notes`).send({ content: 'Talked about hiring' });
+
+    const res = await request(app).get('/api/search?q=quarterly');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+    expect(res.body[0].content).toBe('Discussed quarterly planning');
+    expect(res.body[0].personName).toBe('Alice Smith');
+  });
+
+  test('GET /api/search finds notes by title', async () => {
+    await request(app).post(`/api/people/${personId}/notes`).send({ content: 'Some content', title: 'Sprint Retro' });
+    await request(app).post(`/api/people/${personId}/notes`).send({ content: 'Other content', title: 'Daily Standup' });
+
+    const res = await request(app).get('/api/search?q=retro');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+    expect(res.body[0].title).toBe('Sprint Retro');
+  });
+
+  test('GET /api/search finds notes by tag', async () => {
+    await request(app).post(`/api/people/${personId}/notes`).send({ content: 'Note one', tags: ['planning', 'q2'] });
+    await request(app).post(`/api/people/${personId}/notes`).send({ content: 'Note two', tags: ['hiring'] });
+
+    const res = await request(app).get('/api/search?q=planning');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+    expect(res.body[0].tags).toContain('planning');
+  });
+
+  test('GET /api/search is case-insensitive', async () => {
+    await request(app).post(`/api/people/${personId}/notes`).send({ content: 'Important DECISION about architecture' });
+
+    const res = await request(app).get('/api/search?q=decision');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+  });
+
+  test('GET /api/search searches across multiple people', async () => {
+    const person2 = await request(app).post('/api/people').send({ name: 'Bob Jones' });
+    await request(app).post(`/api/people/${personId}/notes`).send({ content: 'Budget review with Alice' });
+    await request(app).post(`/api/people/${person2.body.id}/notes`).send({ content: 'Budget planning with Bob' });
+
+    const res = await request(app).get('/api/search?q=budget');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(2);
+  });
+
+  test('GET /api/search ranks title matches above content matches', async () => {
+    await request(app).post(`/api/people/${personId}/notes`).send({ content: 'Discussed the roadmap priorities', title: 'General meeting' });
+    await request(app).post(`/api/people/${personId}/notes`).send({ content: 'Other stuff', title: 'Roadmap Review' });
+
+    const res = await request(app).get('/api/search?q=roadmap');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(2);
+    // Title match should come first
+    expect(res.body[0].title).toBe('Roadmap Review');
+  });
+
+  test('GET /api/search returns empty array when no matches', async () => {
+    await request(app).post(`/api/people/${personId}/notes`).send({ content: 'Something else entirely' });
+
+    const res = await request(app).get('/api/search?q=nonexistent');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  test('GET /api/search includes person metadata in results', async () => {
+    await request(app).post(`/api/people/${personId}/notes`).send({ content: 'Test note content' });
+
+    const res = await request(app).get('/api/search?q=test');
+    expect(res.status).toBe(200);
+    expect(res.body[0].personId).toBe(personId);
+    expect(res.body[0].personName).toBe('Alice Smith');
+    expect(res.body[0].personRole).toBe('Engineer');
+    expect(res.body[0].personTeam).toBe('Platform');
+  });
+});
+
 // ── Version API ──────────────────────────────────────────────
 
 describe('Version API', () => {

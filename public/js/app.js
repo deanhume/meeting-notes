@@ -127,6 +127,7 @@ async function showDashboard() {
   // Hide other views
   document.getElementById('welcomeScreen').classList.add('hidden');
   document.getElementById('personView').classList.add('hidden');
+  document.getElementById('searchView').classList.add('hidden');
   
   // Show dashboard view
   const view = document.getElementById('dashboardView');
@@ -213,6 +214,121 @@ function renderDashboard(recentNotes) {
   }).join('');
 }
 
+/* ── Global Search ────────────────────────────────────────── */
+// Searches across all notes (title, content, tags) and displays results
+// in a dedicated view similar to the dashboard layout.
+
+let searchDebounceTimer = null;
+
+async function performSearch(query) {
+  if (!query || !query.trim()) {
+    document.getElementById('searchView').classList.add('hidden');
+    document.getElementById('welcomeScreen').classList.remove('hidden');
+    return;
+  }
+
+  // Hide other views and show search results
+  currentPersonId = null;
+  document.querySelectorAll('.person-item').forEach(el => {
+    el.classList.remove('active');
+  });
+  document.getElementById('welcomeScreen').classList.add('hidden');
+  document.getElementById('personView').classList.add('hidden');
+  document.getElementById('dashboardView').classList.add('hidden');
+  document.getElementById('searchView').classList.remove('hidden');
+
+  document.getElementById('searchViewQuery').textContent = `Showing results for "${query}"`;
+
+  try {
+    const results = await api('GET', `/api/search?q=${encodeURIComponent(query)}`);
+    renderSearchResults(results, query);
+  } catch (e) {
+    document.getElementById('searchResults').innerHTML =
+      `<div class="dashboard-empty">Search failed: ${escHtml(e.message)}</div>`;
+  }
+}
+
+function renderSearchResults(results, query) {
+  const container = document.getElementById('searchResults');
+
+  if (results.length === 0) {
+    container.innerHTML = '<div class="dashboard-empty">No notes found matching your search.</div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="search-results-count">${results.length} result${results.length !== 1 ? 's' : ''}</div>
+    ${results.map(note => {
+      const tagsHtml = (note.tags && note.tags.length > 0)
+        ? `<div class="note-tags">${note.tags.map(t => `<span class="note-tag">${escHtml(t)}</span>`).join('')}</div>`
+        : '';
+
+      // Highlight the search term in the content snippet
+      const snippet = getSearchSnippet(note.content, query);
+
+      return `
+        <div class="dashboard-note-card search-result-card" data-person-id="${note.personId}">
+          <div class="dashboard-note-header">
+            <div class="dashboard-note-person">
+              <div class="dashboard-note-avatar">${initials(note.personName)}</div>
+              <div>
+                <div class="dashboard-note-person-name">${escHtml(note.personName)}</div>
+                ${note.personRole || note.personTeam ? `<div class="dashboard-note-person-meta">${[note.personRole, note.personTeam].filter(Boolean).join(' · ')}</div>` : ''}
+              </div>
+            </div>
+            <div class="dashboard-note-date">${formatDate(note.createdAt)}</div>
+          </div>
+          ${note.title ? `<div class="dashboard-note-title">${highlightMatch(escHtml(note.title), query)}</div>` : ''}
+          <div class="dashboard-note-content">${snippet}</div>
+          ${tagsHtml}
+        </div>
+      `;
+    }).join('')}
+  `;
+
+  // Click on a search result card to navigate to that person
+  container.querySelectorAll('.search-result-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const personId = card.dataset.personId;
+      document.getElementById('globalSearch').value = '';
+      selectPerson(personId);
+    });
+  });
+}
+
+// Extract a short snippet around the first match in the content
+function getSearchSnippet(content, query) {
+  if (!content) return '';
+
+  const lowerContent = content.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  const matchIndex = lowerContent.indexOf(lowerQuery);
+
+  if (matchIndex === -1) {
+    // No content match (matched on title or tag) — show the start
+    const truncated = content.substring(0, 200);
+    return escHtml(truncated) + (content.length > 200 ? '…' : '');
+  }
+
+  // Show text around the match with some context
+  const snippetStart = Math.max(0, matchIndex - 80);
+  const snippetEnd = Math.min(content.length, matchIndex + query.length + 120);
+  let snippet = content.substring(snippetStart, snippetEnd);
+
+  if (snippetStart > 0) snippet = '…' + snippet;
+  if (snippetEnd < content.length) snippet = snippet + '…';
+
+  return highlightMatch(escHtml(snippet), query);
+}
+
+// Highlight all occurrences of a query term in already-escaped HTML text
+function highlightMatch(escapedText, query) {
+  if (!query) return escapedText;
+  const escapedQuery = escHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escapedQuery})`, 'gi');
+  return escapedText.replace(regex, '<mark>$1</mark>');
+}
+
 /* ── Render Sidebar ───────────────────────────────────────── */
 function renderPeopleList(filter = '') {
   const list = document.getElementById('peopleList');
@@ -258,6 +374,7 @@ async function selectPerson(id) {
   // Hide other views
   document.getElementById('welcomeScreen').classList.add('hidden');
   document.getElementById('dashboardView').classList.add('hidden');
+  document.getElementById('searchView').classList.add('hidden');
   
   // Show person view
   const view = document.getElementById('personView');
@@ -273,7 +390,7 @@ async function selectPerson(id) {
   try {
     currentNotes = await api('GET', `/api/people/${id}/notes`);
     noteCountCache[id] = currentNotes.length;
-    renderPeopleList(document.getElementById('searchPeople').value);
+    renderPeopleList();
     renderNotes();
   } catch (e) {
     showError(e.message);
@@ -519,7 +636,7 @@ async function savePersonModal() {
       people.push(person);
       noteCountCache[person.id] = 0;
     }
-    renderPeopleList(document.getElementById('searchPeople').value);
+    renderPeopleList();
     closePersonModal();
   } catch (e) {
     showError(e.message);
@@ -537,7 +654,7 @@ async function deletePerson(id) {
         await api('DELETE', `/api/people/${id}`);
         people = people.filter(p => p.id !== id);
         delete noteCountCache[id];
-        renderPeopleList(document.getElementById('searchPeople').value);
+        renderPeopleList();
         if (currentPersonId === id) {
           currentPersonId = null;
           document.getElementById('personView').classList.add('hidden');
@@ -699,7 +816,7 @@ async function saveNoteModal() {
       const note = await api('POST', `/api/people/${currentPersonId}/notes`, { title, content, tags });
       currentNotes.unshift(note); // newest first
       noteCountCache[currentPersonId] = (noteCountCache[currentPersonId] || 0) + 1;
-      renderPeopleList(document.getElementById('searchPeople').value);
+      renderPeopleList();
     }
     // Update allTags with any new tags
     tags.forEach(t => { if (!allTags.includes(t)) allTags.push(t); });
@@ -717,7 +834,7 @@ async function deleteNote(noteId) {
       await api('DELETE', `/api/people/${currentPersonId}/notes/${noteId}`);
       currentNotes = currentNotes.filter(n => n.id !== noteId);
       noteCountCache[currentPersonId] = Math.max(0, (noteCountCache[currentPersonId] || 1) - 1);
-      renderPeopleList(document.getElementById('searchPeople').value);
+      renderPeopleList();
       renderNotes();
     } catch (e) { showError(e.message); }
   });
@@ -938,9 +1055,28 @@ async function loadNoteCounts() {
 
 /* ── Event Wiring ─────────────────────────────────────────── */
 function wireEvents() {
-  // Sidebar search
-  document.getElementById('searchPeople').addEventListener('input', e => {
-    renderPeopleList(e.target.value);
+  // Global notes search (searches across all notes via the API)
+  document.getElementById('globalSearch').addEventListener('input', e => {
+    const query = e.target.value.trim();
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    if (!query) {
+      document.getElementById('searchView').classList.add('hidden');
+      if (!currentPersonId) {
+        document.getElementById('welcomeScreen').classList.remove('hidden');
+      }
+      return;
+    }
+    // Debounce: wait 300ms after the user stops typing before searching
+    searchDebounceTimer = setTimeout(() => performSearch(query), 300);
+  });
+
+  // Submit search on Enter (immediate, no debounce wait)
+  document.getElementById('globalSearch').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+      const query = e.target.value.trim();
+      if (query) performSearch(query);
+    }
   });
 
   // Add person button

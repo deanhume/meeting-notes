@@ -25,7 +25,7 @@
       </div>
 
       <div class="sidebar-search">
-        <input type="text" id="searchPeople" placeholder="Search people…" autocomplete="off">
+        <input type="text" id="globalSearch" placeholder="Search all notes…" autocomplete="off">
       </div>
 
       <div class="sidebar-section-label">People</div>
@@ -71,6 +71,15 @@
         </div>
         <div class="dashboard-summary" id="dashboardSummary"></div>
         <div class="dashboard-notes" id="dashboardNotes"></div>
+      </div>
+
+      <!-- Search results view -->
+      <div class="search-view hidden" id="searchView">
+        <div class="search-view-header">
+          <h2>🔍 Search Results</h2>
+          <div class="search-view-query" id="searchViewQuery"></div>
+        </div>
+        <div class="search-results" id="searchResults"></div>
       </div>
 
       <!-- Person view -->

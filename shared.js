@@ -484,6 +484,56 @@ function createApiRoutes(expressApp, options) {
     res.json([...tagSet].sort());
   });
 
+  // ── Search API ──────────────────────────────────────────────
+  // Full-text search across all notes for all people.
+  // Searches note title, content, and tags (case-insensitive substring match).
+  // Returns matching notes enriched with person info, sorted by relevance then date.
+
+  expressApp.get('/api/search', (req, res) => {
+    const query = (req.query.q || '').trim().toLowerCase();
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+    if (query.length > 200) {
+      return res.status(400).json({ error: 'Search query too long (max 200 characters)' });
+    }
+
+    const people = loadPeople();
+    const results = [];
+
+    people.forEach(person => {
+      const notes = loadNotes(person.id);
+      notes.forEach(note => {
+        const titleMatch = (note.title || '').toLowerCase().includes(query);
+        const contentMatch = (note.content || '').toLowerCase().includes(query);
+        const tagMatch = (note.tags || []).some(t => t.toLowerCase().includes(query));
+
+        if (titleMatch || contentMatch || tagMatch) {
+          results.push({
+            ...note,
+            personId: person.id,
+            personName: person.name,
+            personRole: person.role,
+            personTeam: person.team,
+            // Title matches are most relevant, then tag, then content
+            _relevance: (titleMatch ? 3 : 0) + (tagMatch ? 2 : 0) + (contentMatch ? 1 : 0)
+          });
+        }
+      });
+    });
+
+    // Sort by relevance (highest first), then by date (newest first) as tiebreaker
+    results.sort((a, b) => {
+      if (b._relevance !== a._relevance) return b._relevance - a._relevance;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    // Strip the internal _relevance field before sending to the client
+    const cleaned = results.map(({ _relevance, ...rest }) => rest);
+
+    res.json(cleaned);
+  });
+
   // ── Dashboard API ───────────────────────────────────────────
   // Returns all notes created in the last 14 days, enriched with the person's
   // name/role/team, sorted newest-first. Powers the "2-Week Dashboard" view.
