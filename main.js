@@ -15,6 +15,7 @@ const transcription = require('./transcription');
 let mainWindow;
 let server;
 const PORT = 3000;
+let updateStatus = { state: 'idle', message: '' };
 // Settings are stored in the Electron user data directory (e.g. %APPDATA%/meeting-notes/)
 const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
 
@@ -31,6 +32,10 @@ function saveSettings(settings) {
   atomicWriteFile(SETTINGS_FILE, JSON.stringify(settings, null, 2));
 }
 
+function setUpdateStatus(nextStatus) {
+  updateStatus = nextStatus;
+}
+
 // Configure auto-updater
 function setupAutoUpdater() {
   // Log auto-updater events
@@ -41,7 +46,38 @@ function setupAutoUpdater() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
+  autoUpdater.on('checking-for-update', () => {
+    setUpdateStatus({ state: 'checking', message: 'Checking for updates…' });
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    setUpdateStatus({
+      state: 'downloading',
+      version: info.version,
+      message: `Downloading version ${info.version} in the background. You can continue working.`
+    });
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    const percent = Math.round(progress.percent || 0);
+    setUpdateStatus({
+      state: 'downloading',
+      version: updateStatus.version,
+      progress: percent,
+      message: `Downloading version ${updateStatus.version || 'the latest update'} in the background (${percent}%). You can continue working.`
+    });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    setUpdateStatus({ state: 'up-to-date', message: 'You already have the latest version installed.' });
+  });
+
   autoUpdater.on('update-downloaded', (info) => {
+    setUpdateStatus({
+      state: 'downloaded',
+      version: info.version,
+      message: `Version ${info.version} has been downloaded and will be installed when you restart.`
+    });
     dialog.showMessageBox(mainWindow, {
       type: 'info',
       title: 'Update Ready',
@@ -56,6 +92,10 @@ function setupAutoUpdater() {
 
   autoUpdater.on('error', (err) => {
     console.error('Auto-updater error:', err);
+    setUpdateStatus({
+      state: 'error',
+      message: err && err.message ? `Unable to check for updates: ${err.message}` : 'Unable to check for updates right now.'
+    });
   });
 
   // Check for updates on startup (after a delay) and then every hour
@@ -147,6 +187,34 @@ ipcMain.handle('transcription-available', () => {
 // IPC handler: transcribe 16kHz mono PCM (Float32Array) to text, fully on-device
 ipcMain.handle('transcribe-audio', async (_event, pcm) => {
   return transcription.transcribePcm(pcm, app);
+});
+
+ipcMain.handle('get-update-status', () => updateStatus);
+
+ipcMain.handle('check-for-updates', async () => {
+  if (!app.isPackaged) {
+    setUpdateStatus({
+      state: 'unavailable',
+      message: 'Update checks are only available in installed desktop builds.'
+    });
+    return updateStatus;
+  }
+
+  if (updateStatus.state === 'checking' || updateStatus.state === 'downloading') {
+    return updateStatus;
+  }
+
+  try {
+    await autoUpdater.checkForUpdates();
+  } catch (err) {
+    console.error('Manual update check failed:', err);
+    setUpdateStatus({
+      state: 'error',
+      message: err && err.message ? `Unable to check for updates: ${err.message}` : 'Unable to check for updates right now.'
+    });
+  }
+
+  return updateStatus;
 });
 
 // Path of the transcript text file for the in-progress recording. The renderer
