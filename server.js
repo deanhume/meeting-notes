@@ -1,7 +1,10 @@
 /**
  * Standalone web server for Meeting Notes.
- * Used for development/testing without Electron (npm run web).
- * All shared logic lives in shared.js.
+ *
+ * Used for UI development/testing without Electron (npm run web).
+ * Mounts the same API routes from shared.js, serving data from a local ./data
+ * directory. Settings and transcription are NOT available in this mode —
+ * those features require the Electron host (main.js).
  */
 
 const express = require('express');
@@ -10,16 +13,16 @@ const { createApiRoutes } = require('./shared');
 
 const app = express();
 const PORT = 3000;
-// Standalone web mode stores data in a local ./data directory
 const DATA_DIR = path.join(__dirname, 'data');
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Mount all API routes using the shared route factory
+// Mount the shared API routes (same ones Electron uses)
 createApiRoutes(app, { dataDir: DATA_DIR });
 
-// Serve index.html for any unmatched routes (SPA fallback)
+// SPA fallback: serve index.html for any unmatched routes so client-side
+// navigation works if the user refreshes on a deep path
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

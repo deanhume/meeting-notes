@@ -1,7 +1,15 @@
 /**
  * Electron main process for Meeting Notes.
- * Creates the browser window and starts an embedded Express server.
- * All shared logic (validation, routes, helpers) lives in shared.js.
+ *
+ * Responsibilities:
+ *   1. Start an embedded Express server (same API as web mode)
+ *   2. Create the BrowserWindow that loads the app UI
+ *   3. Handle IPC calls from the renderer (folder picker, transcription, updates)
+ *   4. Manage auto-updates via electron-updater + GitHub Releases
+ *
+ * Settings and data live under the Electron user-data directory:
+ *   Windows: %APPDATA%/meeting-notes/
+ *   macOS:   ~/Library/Application Support/meeting-notes/
  */
 
 const { app, BrowserWindow, ipcMain, dialog, Menu, session, desktopCapturer } = require('electron');
@@ -15,11 +23,17 @@ const transcription = require('./transcription');
 let mainWindow;
 let server;
 const PORT = 3000;
+
+// Track the current auto-update state so the renderer can poll it via IPC
 let updateStatus = { state: 'idle', message: '' };
+
 // Settings are stored in the Electron user data directory (e.g. %APPDATA%/meeting-notes/)
 const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
 
-// Load settings from disk, falling back to default data location
+// ── Settings persistence ──────────────────────────────────────
+// Settings determine where data files are stored. Falls back to a "data"
+// subfolder inside the Electron user-data directory on first run.
+
 function loadSettings() {
   const settings = safeLoadJSON(SETTINGS_FILE, null);
   if (settings && settings.dataLocation) {
@@ -32,11 +46,15 @@ function saveSettings(settings) {
   atomicWriteFile(SETTINGS_FILE, JSON.stringify(settings, null, 2));
 }
 
+// ── Auto-updater ─────────────────────────────────────────────
+// Uses electron-updater to check GitHub Releases for new versions.
+// Downloads happen silently in the background; the user is prompted
+// to restart only after the download completes.
+
 function setUpdateStatus(nextStatus) {
   updateStatus = nextStatus;
 }
 
-// Configure auto-updater
 function setupAutoUpdater() {
   // Log auto-updater events
   autoUpdater.logger = require('electron-log');
@@ -108,7 +126,8 @@ function setupAutoUpdater() {
   }, 60 * 60 * 1000); // Check every hour
 }
 
-// Create the main Electron browser window
+// ── Browser window ───────────────────────────────────────────
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -138,7 +157,10 @@ function createWindow() {
   });
 }
 
-// Start the embedded Express server and return a promise that resolves when listening
+// ── Embedded Express server ───────────────────────────────────
+// The renderer loads from localhost:<PORT>. This keeps the app architecture
+// identical to web mode — the frontend always talks to an HTTP API.
+
 function startServer() {
   return new Promise((resolve) => {
     const expressApp = express();
@@ -167,7 +189,11 @@ function startServer() {
   });
 }
 
-// IPC handler: opens a native folder picker dialog for the settings page
+// ── IPC Handlers ─────────────────────────────────────────────
+// These are the only bridges between the renderer and the main process.
+// Each maps to a method exposed via preload.js's contextBridge.
+
+// Opens a native folder picker dialog for the settings page
 ipcMain.handle('select-folder', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory', 'createDirectory']
@@ -179,18 +205,20 @@ ipcMain.handle('select-folder', async () => {
   return null;
 });
 
-// IPC handler: reports whether local speech-to-text is available (model present)
+// Reports whether local speech-to-text is available (Whisper model file present)
 ipcMain.handle('transcription-available', () => {
   return transcription.isModelAvailable(app);
 });
 
-// IPC handler: transcribe 16kHz mono PCM (Float32Array) to text, fully on-device
+// Transcribe 16kHz mono PCM audio to text using on-device Whisper
 ipcMain.handle('transcribe-audio', async (_event, pcm) => {
   return transcription.transcribePcm(pcm, app);
 });
 
+// Return the current auto-update status to the renderer (polled from settings modal)
 ipcMain.handle('get-update-status', () => updateStatus);
 
+// Trigger a manual update check from the settings modal
 ipcMain.handle('check-for-updates', async () => {
   if (!app.isPackaged) {
     setUpdateStatus({
@@ -217,14 +245,15 @@ ipcMain.handle('check-for-updates', async () => {
   return updateStatus;
 });
 
-// Path of the transcript text file for the in-progress recording. The renderer
-// writes transcribed audio to this file in chunks (performant append) and reads
-// it back periodically to produce a live, rolling summary of the meeting.
+// ── Transcript file management ────────────────────────────────
+// During a recording, transcribed audio chunks are appended to a text file in
+// a "transcriptions" subfolder of the data directory. This lets the app build
+// a rolling summary without keeping the entire transcript in memory.
+
+// Path of the transcript text file for the in-progress recording
 let currentTranscriptPath = null;
 
-// IPC handler: begin a new transcript file in a "transcriptions" subfolder of the
-// configured data folder and return its filename. A fresh file is created per
-// recording session, and the subfolder is created on demand if it doesn't exist.
+// Begin a new transcript file for this recording session
 ipcMain.handle('transcript-start', () => {
   const dir = path.join(loadSettings().dataLocation, 'transcriptions');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -234,11 +263,9 @@ ipcMain.handle('transcript-start', () => {
   return path.basename(currentTranscriptPath);
 });
 
-// IPC handler: append a transcribed chunk to the current transcript file. Uses
-// a plain append (not atomic rewrite) so writing stays cheap as the file grows.
+// Append a transcribed chunk to the current transcript file.
 // Each chunk is written on its own line and guaranteed to end with sentence
-// punctuation: the summariser splits on . ! ?, so a pause-cut chunk left without
-// terminal punctuation would otherwise merge with the next into a run-on sentence.
+// punctuation so the summariser can split cleanly on sentence boundaries.
 ipcMain.handle('transcript-append', (_event, text) => {
   if (!currentTranscriptPath || typeof text !== 'string' || !text.trim()) return false;
   let chunk = text.trim();
@@ -247,13 +274,16 @@ ipcMain.handle('transcript-append', (_event, text) => {
   return true;
 });
 
-// IPC handler: read back the full transcript text for the current recording.
+// Read back the full transcript so far (used to produce a summary at recording stop)
 ipcMain.handle('transcript-read', () => {
   if (!currentTranscriptPath || !fs.existsSync(currentTranscriptPath)) return '';
   return fs.readFileSync(currentTranscriptPath, 'utf8');
 });
 
-// Electron lifecycle: wait for server to be ready before opening the window
+// ── Electron lifecycle ────────────────────────────────────────
+// Wait for the Express server to be ready before opening the window, so the
+// renderer never hits a "connection refused" on its initial page load.
+
 app.whenReady().then(async () => {
   await startServer();
 
@@ -296,7 +326,7 @@ app.whenReady().then(async () => {
   });
 });
 
-// Shut down the Express server when all windows are closed
+// Shut down the Express server when all windows are closed (standard Electron pattern)
 app.on('window-all-closed', function () {
   if (server) {
     server.close();

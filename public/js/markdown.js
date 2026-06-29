@@ -1,6 +1,22 @@
-/* ── Lightweight Markdown Renderer ─────────────────────────── */
-/* Converts a subset of Markdown to HTML. No external dependencies. */
+/* ── Lightweight Markdown Renderer ─────────────────────────────
+ * Converts a subset of Markdown to HTML for note previews and display.
+ * No external dependencies — runs entirely in the browser.
+ *
+ * Supported syntax:
+ *   Block:  headings (#–######), fenced code (```), lists (- * + and 1.),
+ *           blockquotes (>), horizontal rules (--- *** ___), paragraphs
+ *   Inline: bold (**), italic (*), strikethrough (~~), inline code (`),
+ *           links [text](url), checkboxes [ ] [x]
+ *
+ * All user input is HTML-escaped first to prevent XSS — Markdown is then
+ * applied on the escaped text, which is safe because the only HTML we emit
+ * is our own structural tags.
+ */
 
+/**
+ * Convert a Markdown string to HTML.
+ * Processes block-level elements line by line, then applies inline formatting.
+ */
 function renderMarkdown(text) {
   if (!text) return '';
 
@@ -11,7 +27,9 @@ function renderMarkdown(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
-  // Split into lines for block-level processing
+  // Split into lines for block-level processing.
+  // Each line is matched against block patterns in priority order; unmatched
+  // non-empty lines become paragraphs.
   const lines = html.split('\n');
   const output = [];
   let inCodeBlock = false;
@@ -117,7 +135,11 @@ function renderMarkdown(text) {
   return output.join('\n');
 }
 
-/* Apply inline markdown formatting */
+/**
+ * Apply inline Markdown formatting to a single line of text.
+ * Order matters: code spans are processed first so that bold/italic markers
+ * inside backticks are not transformed.
+ */
 function applyInline(text) {
   // Inline code (must be first to prevent other transforms inside it)
   text = text.replace(/`([^`]+)`/g, '<code>$1</code>');

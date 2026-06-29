@@ -1,36 +1,42 @@
 /**
  * Local speech-to-text for the Meeting Notes app (Electron main process only).
- * Wraps smart-whisper (whisper.cpp). The model is loaded lazily on first use
- * and kept resident for subsequent transcriptions.
  *
- * Transcription runs on-device — no audio ever leaves the machine.
+ * Wraps smart-whisper (whisper.cpp compiled to a Node native addon).
+ * The Whisper model is loaded lazily on first transcription request and kept
+ * resident in memory for subsequent calls — avoids the ~2s model load on every chunk.
+ *
+ * Privacy: transcription runs entirely on-device. No audio data ever leaves the machine.
+ *
+ * Post-processing pipeline (applied after Whisper decodes):
+ *   1. stripNonSpeech — remove [BLANK_AUDIO], (background noise), ♪ music ♪, etc.
+ *   2. removeFillers — drop "um", "uh", "erm" and similar hesitation words
+ *   3. collapseRepeats — deduplicate stuttered/hallucinated repetitions
+ *   4. normalizeWhitespace — fix spacing around punctuation
+ *   5. toSentenceLines — split into one sentence per line for the summariser
  */
 
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const MODEL_FILENAME = 'ggml-base.bin';
+const MODEL_FILENAME = 'ggml-base.bin'; // ~140MB Whisper "base" model
 
-// Pick a thread count that keeps each transcribe call fast WITHOUT pinning the
-// whole machine. Using every logical core (whisper.cpp's behaviour when given
-// os.cpus().length) drives the CPU to ~100% and, because of hyper-thread
-// contention, yields little speed-up past the physical core count anyway.
-//
-// Thread count changes only throughput, never the decoded output (results are
-// deterministic for a given audio buffer), so leaving headroom does not affect
-// transcription accuracy. We target ~75% of logical cores and always leave at
-// least one core free for the UI / OS, with a floor of 1 thread.
+// ── Thread count tuning ──────────────────────────────────────
+// Use ~75% of logical cores but always leave at least 1 free for the UI/OS.
+// More threads than physical cores yields diminishing returns due to
+// hyper-thread contention, and pinning 100% CPU makes the app feel unresponsive.
 const LOGICAL_CORES = Math.max(1, os.cpus().length);
 const N_THREADS = Math.max(
   1,
   Math.min(LOGICAL_CORES - 1, Math.round(LOGICAL_CORES * 0.75))
 );
 
-let whisper = null;       // resident Whisper instance
-let loadingPromise = null; // de-dupe concurrent loads
+let whisper = null;        // Resident Whisper instance (loaded once, stays in memory)
+let loadingPromise = null; // De-duplicates concurrent load attempts
 
-// Resolve the bundled model path: ./models in dev, resourcesPath when packaged.
+// ── Model path resolution ────────────────────────────────────
+// In dev mode the model is at ./models/; when packaged it's in the app's resources.
+
 function resolveModelPath(app) {
   if (app && app.isPackaged) {
     return path.join(process.resourcesPath, 'models', MODEL_FILENAME);
@@ -67,30 +73,27 @@ async function getWhisper(app) {
   }
 }
 
-// Hesitation / filler words Whisper transcribes verbatim. Matched whole-word and
-// case-insensitively (and with any trailing run of the same vowel, e.g. "uhhh").
-// Note: the bare "m" filler requires 2+ m's (m{2,}) so it never strips the "m"
-// from contractions like "I'm".
+// ── Transcript cleanup patterns ───────────────────────────────
+
+// Hesitation / filler words Whisper transcribes verbatim.
+// Matched whole-word, case-insensitive. The "m{2,}" avoids stripping the "m" in "I'm".
 const FILLER_PATTERN = /\b(?:u+m+|u+h+|e+r+m?|a+h+|e+h+|h+m+|m+h+m+|m{2,}|uh[\s-]?huh)\b[,]?/gi;
 
-// Non-speech annotations Whisper emits on noise/silence, e.g. "[BLANK_AUDIO]",
-// "(background noise)", "*laughs*", "♪ music ♪".
+// Non-speech annotations Whisper emits (e.g. "[BLANK_AUDIO]", "(background noise)", "♪ music ♪")
 const NON_SPEECH_PATTERN = /[\[(*][^\])*]*[\])*]|[♪♫]+/g;
 
-// Strip bracketed/parenthesised non-speech markers and musical-note glyphs.
+// ── Cleanup functions (each handles one type of noise) ────────
+
 function stripNonSpeech(text) {
   return text.replace(NON_SPEECH_PATTERN, ' ');
 }
 
-// Drop standalone filler/hesitation words ("um", "uh", "erm", "hmm"…).
 function removeFillers(text) {
   return text.replace(FILLER_PATTERN, ' ');
 }
 
-// Collapse Whisper's repetition hallucinations: immediately repeated words
-// ("the the the" → "the") and back-to-back repeated short phrases
-// ("thank you thank you" → "thank you"). Runs to a fixed point so long loops
-// fully collapse.
+// Collapse Whisper's repetition hallucinations (e.g. "the the the" → "the").
+// Runs to a fixed point so even long loops fully collapse.
 function collapseRepeats(text) {
   let prev;
   do {
@@ -104,7 +107,7 @@ function collapseRepeats(text) {
   return text;
 }
 
-// Tidy spacing: no space before punctuation, single spaces, trimmed.
+// Tidy spacing: no space before punctuation, collapse multiple spaces, trim
 function normalizeWhitespace(text) {
   return text
     .replace(/\s+([,.!?;:])/g, '$1')
@@ -112,17 +115,17 @@ function normalizeWhitespace(text) {
     .trim();
 }
 
-// Put each sentence on its own line. Whisper-base sometimes omits terminal
-// punctuation, so a fallback keeps any trailing unpunctuated remainder.
+// Split text into one sentence per line (the format the summariser expects)
 function toSentenceLines(text) {
   const sentences = text.match(/[^.!?]+[.!?]+["')\]]*|\S[^.!?]*$/g);
   if (!sentences) return text;
   return sentences.map((s) => s.trim()).filter(Boolean).join('\n');
 }
 
-// Clean a raw Whisper transcript: remove non-speech markers and filler words,
-// collapse repetition loops, normalise whitespace, and split into one sentence
-// per line. Exported for unit testing (no native addon required).
+/**
+ * Full cleanup pipeline: apply all post-processing steps to raw Whisper output.
+ * Exported so it can be unit-tested without loading the native Whisper addon.
+ */
 function cleanTranscript(text) {
   if (!text) return '';
   let out = stripNonSpeech(text);

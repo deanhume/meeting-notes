@@ -1,21 +1,52 @@
+/* ─────────────────────────────────────────────────────────────
+ * Meeting Notes — Frontend Application
+ * ─────────────────────────────────────────────────────────────
+ * Single-file vanilla JS frontend (no framework, no bundler).
+ * Communicates with the backend via fetch() to /api/* endpoints.
+ *
+ * Key sections:
+ *   - State & API helpers
+ *   - Formatting utilities (dates, initials)
+ *   - Theme toggle
+ *   - Dashboard view
+ *   - Sidebar (people list)
+ *   - Person view (notes list)
+ *   - Modals (person, note, questions, settings, confirm)
+ *   - Markdown toolbar
+ *   - Voice recording & live transcription
+ *   - Init / bootstrap
+ *
+ * Dependencies (loaded before this script via <script> tags):
+ *   - markdown.js (renderMarkdown)
+ *   - summarizer.js (summarizeToBullets)
+ * ─────────────────────────────────────────────────────────────
+ */
+
 /* ── State ────────────────────────────────────────────────── */
-let people = [];
-let currentPersonId = null;
-let currentNotes = [];
-let editingPersonId = null;
-let editingNoteId = null;
-let confirmCallback = null;
-let noteCountCache = {};
-let questions = [];
-let currentQuestion = '';
-let allTags = [];
-let currentTags = [];
-let filterTag = null;
-let isDarkTheme = true; // Default to dark theme
-let autosaveKeystrokeCount = 0;
-let autosaveTimer = null;
+// Global application state. Mutated by user interactions and API responses.
+let people = [];               // All people loaded from the backend
+let currentPersonId = null;    // Currently selected person (null = no selection)
+let currentNotes = [];         // Notes for the currently selected person
+let editingPersonId = null;    // Person being edited in the modal (null = creating new)
+let editingNoteId = null;      // Note being edited in the modal (null = creating new)
+let confirmCallback = null;    // Function to call when user clicks "OK" in confirm modal
+let noteCountCache = {};       // personId → note count (avoids refetching for sidebar badges)
+let questions = [];            // Discussion prompt questions from the backend
+let currentQuestion = '';      // Currently displayed question in the note modal
+let allTags = [];              // All unique tags (for autocomplete suggestions)
+let currentTags = [];          // Tags being edited in the note modal
+let filterTag = null;          // Active tag filter for the notes list (null = show all)
+let isDarkTheme = true;        // Current theme state (default: dark)
+let autosaveKeystrokeCount = 0; // Keystrokes since last autosave
+let autosaveTimer = null;      // Timer for hiding the autosave indicator
 
 /* ── API helpers ──────────────────────────────────────────── */
+
+/**
+ * Generic fetch wrapper for all backend API calls.
+ * Automatically sets Content-Type for JSON bodies and throws on non-2xx responses
+ * with the error message from the server.
+ */
 async function api(method, path, body) {
   const res = await fetch(path, {
     method,
@@ -30,6 +61,9 @@ async function api(method, path, body) {
 }
 
 /* ── Formatting ───────────────────────────────────────────── */
+
+// Format a date as a relative time string ("just now", "3m ago", "2d ago")
+// or fall back to a short absolute date for older entries.
 function formatDate(iso) {
   const d = new Date(iso);
   const now = new Date();
@@ -46,17 +80,22 @@ function formatDate(iso) {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+// Format a date as a full human-readable string (e.g. "Mon 5 Jan 2026 · 14:30")
 function formatDateFull(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
     + ' · ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
+// Extract up to 2 initials from a name for avatar circles (e.g. "Sarah Chen" → "SC")
 function initials(name) {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
 /* ── Theme Toggle ─────────────────────────────────────────── */
+// Theme is stored in localStorage so it persists across sessions.
+// The body gets a "light-theme" class; CSS custom properties handle the rest.
+
 function toggleTheme() {
   isDarkTheme = !isDarkTheme;
   document.body.classList.toggle('light-theme', !isDarkTheme);
@@ -74,6 +113,9 @@ function loadThemePreference() {
 }
 
 /* ── Dashboard ────────────────────────────────────────────── */
+// Shows a summary of all notes from the last 2 weeks across all people.
+// Includes stats (total meetings, people met) and top tags.
+
 async function showDashboard() {
   currentPersonId = null;
   
@@ -422,6 +464,7 @@ function wireTagsInput() {
 }
 
 /* ── Escape HTML ──────────────────────────────────────────── */
+// Prevents XSS when interpolating user-supplied text into innerHTML
 function escHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -506,6 +549,9 @@ async function deletePerson(id) {
 }
 
 /* ── Note Modal ───────────────────────────────────────────── */
+// The note modal supports both creating new notes and editing existing ones.
+// When editing, autosave fires every 20 keystrokes so work isn't lost.
+
 function getRandomQuestion() {
   if (questions.length === 0) return 'No questions available';
   const idx = Math.floor(Math.random() * questions.length);
@@ -706,9 +752,16 @@ async function saveQuestionsModal() {
 }
 
 /* ── Settings Modal ───────────────────────────────────────── */
-let pendingDataLocation = null;
-let updateStatusPoller = null;
+// Electron-only: lets users change the data folder and check for app updates.
+// In web mode, the settings button opens but data-location and updates are disabled.
 
+let pendingDataLocation = null;
+let updateStatusPoller = null;  // Interval that refreshes update status while modal is open
+
+/**
+ * Map raw update status from the main process into UI labels.
+ * Returns { buttonText, buttonDisabled, statusText } for the settings modal.
+ */
 function getUpdateStatusViewModel(status, isDesktopApp) {
   if (!isDesktopApp) {
     return {
@@ -1086,47 +1139,58 @@ function applyMarkdownAction(textarea, action) {
 }
 
 /* ── Voice recording → local transcription ────────────────── */
+// This section handles recording audio (mic, system audio, or both), sending it
+// to the main process for on-device Whisper transcription, and inserting the
+// resulting summary into the note textarea.
+//
+// Flow:
+//   1. User clicks Record → buildCaptureStream() gets mic + system audio
+//   2. MediaRecorder captures in 1s chunks (recordedChunks grows)
+//   3. Every LIVE_CHUNK_MS, transcribeLiveChunk() sends new audio to Whisper
+//      and appends text to the transcript file
+//   4. User clicks Stop → handleRecordingStop() transcribes the remaining tail,
+//      reads the full transcript file, summarises it, and writes the summary
+//      into the note textarea
+
 let mediaRecorder = null;
-let recordedChunks = [];
-let recordSources = [];   // raw MediaStreams to stop on cleanup
-let mixContext = null;    // AudioContext used when mixing mic + system
-let recordStream = null;  // audio-only stream fed to MediaRecorder
+let recordedChunks = [];       // Array of Blobs from MediaRecorder's ondataavailable
+let recordSources = [];        // Raw MediaStreams to stop on cleanup
+let mixContext = null;         // AudioContext used when mixing mic + system
+let recordStream = null;       // Final audio-only stream fed to MediaRecorder
 let recordTimerInterval = null;
 let recordStartTime = 0;
-let isTranscribing = false;
-let isStarting = false;       // true during async capture setup (click → stream ready)
+let isTranscribing = false;    // True during the final transcription pass after Stop
+let isStarting = false;        // True during async capture setup (blocks double-clicks)
 
-// Live (chunked) transcription state. While recording, audio is transcribed in
-// the background every LIVE_CHUNK_MS and the resulting text is appended to a
-// transcript file in the data folder. The transcript is only read back and
-// summarised into the note once, when the user presses Stop (handleRecordingStop).
-let liveInterval = null;      // timer that kicks off background transcription chunks
-let liveWordCount = 0;        // words transcribed so far (for the status line)
-let processedSamples = 0;     // 16kHz-sample cursor: audio already transcribed
-let liveBusy = false;         // a chunk transcription is in flight
-let liveOpPromise = null;     // resolves when the in-flight chunk finishes
-let liveSummaryText = '';     // summary block written into the note at Stop
-let recordingStopWaiters = []; // resolved when handleRecordingStop has fully finished
+// ── Live (chunked) transcription state ──
+// While recording, audio is transcribed in background chunks and appended to a
+// transcript file. The transcript is only summarised into the note once at Stop.
+let liveInterval = null;       // Timer that kicks off background transcription chunks
+let liveWordCount = 0;         // Running word count (shown in the recording status)
+let processedSamples = 0;      // 16kHz-sample cursor: audio already transcribed up to here
+let liveBusy = false;          // Guards against overlapping chunk transcriptions
+let liveOpPromise = null;      // Resolves when the in-flight chunk finishes
+let liveSummaryText = '';       // The summary block currently in the note textarea
+let recordingStopWaiters = []; // Promises resolved when handleRecordingStop finishes
 
-const SAMPLE_RATE = 16000;
-// Transcribe in the background frequently while recording so most of the audio is
-// already done by the time the user presses Stop — only a short tail then remains,
-// making "Finishing transcription" feel near-instant for longer recordings. The
-// liveBusy guard self-throttles: ticks that land while a transcription is still in
-// flight are skipped, so a small interval never queues up overlapping work.
-const LIVE_CHUNK_MS = 5000;                        // attempt a transcription chunk every 5s
-const LIVE_MIN_CHUNK_SAMPLES = SAMPLE_RATE * 2;    // need ≥2s of new audio
-const LIVE_EDGE_GUARD_SAMPLES = SAMPLE_RATE * 0.8; // leave ~0.8s live edge unprocessed
+// ── Recording constants ──
+const SAMPLE_RATE = 16000;     // Whisper expects 16kHz mono PCM
+const LIVE_CHUNK_MS = 5000;    // Attempt a transcription chunk every 5 seconds
+const LIVE_MIN_CHUNK_SAMPLES = SAMPLE_RATE * 2;    // Need at least 2s of new audio per chunk
+const LIVE_EDGE_GUARD_SAMPLES = SAMPLE_RATE * 0.8; // Leave ~0.8s unprocessed to avoid cutting mid-word
 
-// Recording-duration thresholds (seconds): warn near, then past, ~15 min.
-const RECORD_WARN_SECONDS = 13 * 60;
-const RECORD_HARD_SECONDS = 15 * 60;
+// Recording-duration thresholds: warn the user as they approach limits where
+// transcription becomes slow and memory-heavy
+const RECORD_WARN_SECONDS = 13 * 60;  // Show "consider stopping" at 13 min
+const RECORD_HARD_SECONDS = 15 * 60;  // Show "very long" warning at 15 min
 
+// Check if transcription is possible (Electron + Whisper model present + browser audio APIs)
 function transcriptionSupported() {
   return !!(window.electronAPI && window.electronAPI.transcribeAudio &&
     navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
 
+// Show the Record button only when transcription is fully available
 async function wireRecordButton() {
   const btn = document.getElementById('recordBtn');
   if (!btn || !transcriptionSupported()) return; // stays hidden (e.g. web mode)
@@ -1153,7 +1217,11 @@ async function toggleRecording() {
   }
 }
 
-// Build a single audio-only MediaStream from the selected source(s).
+/**
+ * Build a single audio-only MediaStream from the selected source(s).
+ * Modes: "mic" (microphone only), "system" (desktop audio loopback), "both" (mixed).
+ * When mixing, Web Audio merges both sources into one track for MediaRecorder.
+ */
 async function buildCaptureStream(mode) {
   let micStream = null;
   let sysStream = null;
@@ -1421,7 +1489,10 @@ function findQuietCut(pcm, fromIdx, maxIdx) {
   return bestIdx;
 }
 
-// Decode any captured audio and resample to the 16kHz mono PCM Whisper expects.
+/**
+ * Decode a recorded audio Blob and resample to 16kHz mono PCM Float32Array.
+ * This is the format Whisper expects. Uses OfflineAudioContext for resampling.
+ */
 async function blobToPcm16kMono(blob) {
   const arrayBuf = await blob.arrayBuffer();
   const decodeCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1483,6 +1554,9 @@ function updateLiveSummary(transcript) {
 }
 
 /* ── Init ─────────────────────────────────────────────────── */
+// Bootstrap the app: load data from the backend, wire up all event listeners,
+// and show the initial view. If the server is unreachable, show an error message.
+
 async function init() {
   try {
     loadThemePreference(); // Load theme before rendering
@@ -1511,12 +1585,15 @@ async function loadVersion() {
   }
 }
 
+// Dual export: in the browser this file runs as a script; in Jest tests it's
+// required as a CommonJS module for unit-testing specific functions.
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     getUpdateStatusViewModel
   };
 }
 
+// Start the app when running in a browser (skipped during Jest imports)
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   init();
 }
