@@ -19,6 +19,7 @@ const express = require('express');
 const { autoUpdater } = require('electron-updater');
 const { safeLoadJSON, atomicWriteFile, createApiRoutes } = require('./shared');
 const transcription = require('./transcription');
+const { getTranscriptFilePath } = require('./transcript-file');
 
 let mainWindow;
 let server;
@@ -253,13 +254,15 @@ ipcMain.handle('check-for-updates', async () => {
 // Path of the transcript text file for the in-progress recording
 let currentTranscriptPath = null;
 
-// Begin a new transcript file for this recording session
-ipcMain.handle('transcript-start', () => {
-  const dir = path.join(loadSettings().dataLocation, 'transcriptions');
+// Begin (or resume) the transcript file for this note/recording session.
+ipcMain.handle('transcript-start', (_event, noteId) => {
+  const { dataLocation } = loadSettings();
+  const dir = path.join(dataLocation, 'transcriptions');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  currentTranscriptPath = path.join(dir, `transcript_${stamp}.txt`);
-  fs.writeFileSync(currentTranscriptPath, '', 'utf8');
+  currentTranscriptPath = getTranscriptFilePath(dataLocation, noteId);
+  if (!fs.existsSync(currentTranscriptPath)) {
+    fs.writeFileSync(currentTranscriptPath, '', 'utf8');
+  }
   return path.basename(currentTranscriptPath);
 });
 

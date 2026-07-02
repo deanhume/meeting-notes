@@ -1424,7 +1424,7 @@ async function startRecording() {
   // Start a fresh transcript file in the configured data folder. Transcribed
   // audio is appended here in chunks and read back to build the live summary.
   try {
-    await window.electronAPI.transcriptStart();
+    await window.electronAPI.transcriptStart(editingNoteId);
   } catch (e) {
     console.error('Could not start transcript file:', e);
   }
