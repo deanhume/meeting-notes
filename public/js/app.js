@@ -1282,8 +1282,11 @@ function applyMarkdownAction(textarea, action) {
 // Flow:
 //   1. User clicks Record → buildCaptureStream() gets mic + system audio
 //   2. MediaRecorder captures in 1s chunks (recordedChunks grows)
-//   3. Every LIVE_CHUNK_MS, transcribeLiveChunk() sends new audio to Whisper
-//      and appends text to the transcript file
+//   3. Every LIVE_CHUNK_MS (20 s), transcribeLiveChunk() sends new audio to
+//      Whisper, appends text to the transcript file, and — once the write is
+//      complete — reads the file back and refreshes the summary in the note.
+//      This prevents data loss: the note is kept up-to-date throughout the
+//      recording so a crash or unexpected close loses at most ~20 s of content.
 //   4. User clicks Stop → handleRecordingStop() transcribes the remaining tail,
 //      reads the full transcript file, summarises it, and writes the summary
 //      into the note textarea
@@ -1300,7 +1303,8 @@ let isStarting = false;        // True during async capture setup (blocks double
 
 // ── Live (chunked) transcription state ──
 // While recording, audio is transcribed in background chunks and appended to a
-// transcript file. The transcript is only summarised into the note once at Stop.
+// transcript file. After each chunk write the note's summary is refreshed so
+// data is preserved even if the recording is stopped unexpectedly.
 let liveInterval = null;       // Timer that kicks off background transcription chunks
 let liveWordCount = 0;         // Running word count (shown in the recording status)
 let processedSamples = 0;      // 16kHz-sample cursor: audio already transcribed up to here
@@ -1311,7 +1315,7 @@ let recordingStopWaiters = []; // Promises resolved when handleRecordingStop fin
 
 // ── Recording constants ──
 const SAMPLE_RATE = 16000;     // Whisper expects 16kHz mono PCM
-const LIVE_CHUNK_MS = 5000;    // Attempt a transcription chunk every 5 seconds
+const LIVE_CHUNK_MS = 20000;   // Attempt a transcription chunk every 20 seconds
 const LIVE_MIN_CHUNK_SAMPLES = SAMPLE_RATE * 2;    // Need at least 2s of new audio per chunk
 const LIVE_EDGE_GUARD_SAMPLES = SAMPLE_RATE * 0.8; // Leave ~0.8s unprocessed to avoid cutting mid-word
 
@@ -1589,12 +1593,17 @@ async function transcribeLiveChunk(force) {
 
       const text = await window.electronAPI.transcribeAudio(chunkPcm);
       processedSamples = cut;
-      // Write the transcribed chunk to the transcript file (append, performant).
-      // The rolling summary is produced separately by refreshSummaryFromFile().
+      // Write the transcribed chunk to the transcript file (append).
+      // Once the write is confirmed, refresh the note's summary from the file so
+      // the note stays up-to-date throughout the recording (data-loss prevention).
+      // The forced final flush at Stop skips this — handleRecordingStop calls
+      // refreshSummaryFromFile() explicitly after the tail is appended.
+      // Both operations share the same try/catch so any error is logged once.
       if (text) {
         liveWordCount += text.split(/\s+/).filter(Boolean).length;
         try {
           await window.electronAPI.transcriptAppend(text);
+          if (!force) await refreshSummaryFromFile();
         } catch (e) {
           console.error('Appending to transcript file failed:', e);
         }
@@ -1649,7 +1658,9 @@ async function blobToPcm16kMono(blob) {
 
 // Read the transcript file written during recording, summarise it, and update the
 // note's summary block. Returns true if the file contained any transcribed text.
-// Called on a 30s timer for a real-time feel, and once more on Stop for a final pass.
+// Called after each live chunk is written to the transcript file (every ~20 s)
+// so the note stays current throughout the recording, and once more on Stop for
+// the final pass after the remaining tail has been flushed.
 async function refreshSummaryFromFile() {
   let transcript = '';
   try {
