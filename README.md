@@ -46,16 +46,16 @@ If your browser blocks the download first (e.g. Edge/Chrome says it "can't be do
 git clone https://github.com/deanhume/meeting-notes.git
 cd meeting-notes
 npm install
-npm run fetch-model   # downloads the local speech-to-text model (~140 MB)
+npm run fetch-model   # downloads the bundled speech-to-text model (~466 MB)
 npm start
 ```
 
-> The Whisper model (`models/ggml-base.bin`) powers offline voice transcription. It is
-> not committed to git; `npm run fetch-model` downloads it. The Record button is hidden
-> until the model is present. You can choose a different model tier in **Settings ▸ Voice
-> Transcription** (Tiny / Base / Small, or Auto to match your CPU). Download the heavier
-> "small" model with `npm run fetch-model -- small` — it's more accurate but needs a
-> faster CPU. GPU acceleration is used automatically when available.
+> The Whisper model (`models/ggml-small.en.bin`, ~466 MB) powers offline voice
+> transcription. It is not committed to git; `npm run fetch-model` downloads it, and
+> the build bundles it into the installer so **end users never download anything**.
+> The Record button is hidden until the model is present. Because it's the accurate
+> (heavier) "small" model, **Settings ▸ Voice Transcription** lets you toggle GPU
+> acceleration and tune CPU thread count so it keeps up on slower machines.
 
 ## Documentation
 

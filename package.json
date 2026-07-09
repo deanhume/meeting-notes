@@ -46,8 +46,8 @@
     ],
     "extraResources": [
       {
-        "from": "models/ggml-base.bin",
-        "to": "models/ggml-base.bin"
+        "from": "models/ggml-small.en.bin",
+        "to": "models/ggml-small.en.bin"
       }
     ],
     "asarUnpack": [

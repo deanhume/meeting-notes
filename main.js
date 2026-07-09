@@ -222,15 +222,12 @@ ipcMain.handle('transcription-info', () => {
   return transcription.transcriptionInfo(app, loadSettings());
 });
 
-// Persist transcription settings (model / GPU / threads) and drop the resident
-// model so the next transcription reloads with the new configuration.
+// Persist transcription settings (GPU / threads) and drop the resident model so
+// the next transcription reloads with the new configuration.
 ipcMain.handle('save-transcription-settings', async (_event, incoming) => {
   const settings = loadSettings();
   const t = settings.transcription || {};
   if (incoming && typeof incoming === 'object') {
-    if (typeof incoming.model === 'string' && (incoming.model === 'auto' || transcription.MODELS[incoming.model])) {
-      t.model = incoming.model;
-    }
     if (typeof incoming.gpu === 'boolean') {
       t.gpu = incoming.gpu;
     }

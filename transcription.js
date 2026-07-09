@@ -19,21 +19,15 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-// ── Model registry ───────────────────────────────────────────
-// Selectable Whisper models, ordered from lightest to heaviest. Larger models are
-// more accurate but need more CPU/RAM and download bandwidth. English-only (.en)
-// variants are used where available since the app always transcribes with
-// language: 'en'. "base" keeps the original multilingual filename so existing
-// installs (bundled / previously downloaded ggml-base.bin) keep working.
+// ── Model ────────────────────────────────────────────────────
+// A single Whisper model is bundled with the app: "small" (English-only). It is
+// the most accurate of the practical whisper.cpp tiers and, because it ships in
+// the installer, every user has the exact same model with no download step. The
+// GPU + thread settings below let weaker machines cope with its heavier cost.
 const MODEL_BASE_URL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/';
-const MODELS = {
-  tiny: { file: 'ggml-tiny.en.bin', size: '~75 MB', label: 'Tiny — fastest, least accurate' },
-  base: { file: 'ggml-base.bin', size: '~142 MB', label: 'Base — balanced (default)' },
-  small: { file: 'ggml-small.en.bin', size: '~466 MB', label: 'Small — most accurate, slowest' },
-};
-// Ascending order of size / CPU cost — used for tier comparisons and fallback.
-const MODEL_ORDER = ['tiny', 'base', 'small'];
-const DEFAULT_MODEL_KEY = 'base';
+const MODEL_FILENAME = 'ggml-small.en.bin';
+const MODEL_SIZE = '~466 MB';
+const MODEL_URL = MODEL_BASE_URL + MODEL_FILENAME;
 
 // ── CPU / thread tuning ──────────────────────────────────────
 // Default to ~75% of logical cores but always leave at least 1 free for the UI/OS.
@@ -45,29 +39,16 @@ const DEFAULT_THREADS = Math.max(
   Math.min(LOGICAL_CORES - 1, Math.round(LOGICAL_CORES * 0.75))
 );
 
-// Backwards-compatible aliases (older references / tests).
-const MODEL_FILENAME = MODELS[DEFAULT_MODEL_KEY].file;
-const N_THREADS = DEFAULT_THREADS;
-
 let whisper = null;        // Resident Whisper instance (loaded once, stays in memory)
 let loadingPromise = null; // De-duplicates concurrent load attempts
-let currentModelKey = null; // Which model the resident instance was loaded with
 let currentGpu = null;      // Whether the resident instance was loaded with GPU
 
-// ── Model selection ──────────────────────────────────────────
+// ── Model resolution ─────────────────────────────────────────
 
-// Recommend a model tier from the machine's logical core count. Weaker machines
-// (laptops) get a lighter model so transcription keeps up; beefier desktops get
-// the more accurate one. This backs the "Auto" setting.
-function recommendModel(cores = LOGICAL_CORES) {
-  if (cores <= 4) return 'tiny';
-  if (cores <= 8) return 'base';
-  return 'small';
-}
-
-// Directories searched for a model file, in priority order:
-//   1. userData/models — where user-downloaded models live (writable when packaged)
-//   2. packaged resources/models (or ./models in dev) — the bundled model
+// Directories searched for the model file, in priority order:
+//   1. userData/models — writable location (e.g. a re-downloaded copy)
+//   2. packaged resources/models — the bundled model
+//   3. ./models — dev checkout
 function modelDirs(app) {
   const dirs = [];
   if (app && typeof app.getPath === 'function') {
@@ -80,59 +61,20 @@ function modelDirs(app) {
   return dirs;
 }
 
-// Absolute path to a model's file — the first existing copy across modelDirs, or
+// Absolute path to the model file — the first existing copy across modelDirs, or
 // the primary (first) dir if none exists yet.
-function resolveModelPath(app, key = DEFAULT_MODEL_KEY) {
-  const entry = MODELS[key] || MODELS[DEFAULT_MODEL_KEY];
+function resolveModelPath(app) {
   const dirs = modelDirs(app);
   for (const dir of dirs) {
-    const p = path.join(dir, entry.file);
+    const p = path.join(dir, MODEL_FILENAME);
     if (fs.existsSync(p)) return p;
   }
-  return path.join(dirs[0], entry.file);
+  return path.join(dirs[0], MODEL_FILENAME);
 }
 
-function isModelInstalled(app, key) {
-  const entry = MODELS[key];
-  if (!entry) return false;
-  return modelDirs(app).some((dir) => fs.existsSync(path.join(dir, entry.file)));
-}
-
-function installedModels(app) {
-  return MODEL_ORDER.filter((k) => isModelInstalled(app, k));
-}
-
-// Speech-to-text is available when at least one model file is present.
+// Speech-to-text is available when the bundled model file is present.
 function isModelAvailable(app) {
-  return installedModels(app).length > 0;
-}
-
-// Pure model-choice logic (unit-tested without the filesystem): given the set of
-// installed model keys, the requested setting ('auto' or a key), and the core
-// count, pick the model to actually load. Honours an explicit installed choice;
-// for 'auto' (or an uninstalled explicit choice) it targets the recommended tier
-// and falls back to the closest installed model at or below that tier.
-function pickModelKey(installed, requested, cores = LOGICAL_CORES) {
-  if (!installed || installed.length === 0) return null;
-  if (requested && requested !== 'auto' && installed.includes(requested)) return requested;
-
-  const target = (requested && requested !== 'auto' && MODELS[requested])
-    ? requested
-    : recommendModel(cores);
-  const targetIdx = MODEL_ORDER.indexOf(target);
-
-  for (let i = targetIdx; i >= 0; i -= 1) {
-    if (installed.includes(MODEL_ORDER[i])) return MODEL_ORDER[i];
-  }
-  for (let i = targetIdx + 1; i < MODEL_ORDER.length; i += 1) {
-    if (installed.includes(MODEL_ORDER[i])) return MODEL_ORDER[i];
-  }
-  return installed[0];
-}
-
-function resolveModelKey(app, settings) {
-  const requested = settings && settings.transcription && settings.transcription.model;
-  return pickModelKey(installedModels(app), requested || 'auto', LOGICAL_CORES);
+  return modelDirs(app).some((dir) => fs.existsSync(path.join(dir, MODEL_FILENAME)));
 }
 
 // Resolve the thread count to use: an explicit positive integer (clamped to the
@@ -146,26 +88,25 @@ function computeThreads(requested) {
 // ── Model lifecycle ──────────────────────────────────────────
 
 // Drop (and free) the resident model so the next transcription reloads with fresh
-// settings. Called after the user changes the model/GPU setting.
+// settings. Called after the user changes the GPU setting.
 async function resetWhisper() {
   const instance = whisper;
   whisper = null;
-  currentModelKey = null;
   currentGpu = null;
   if (instance && typeof instance.free === 'function') {
     try { await instance.free(); } catch (_) { /* best effort */ }
   }
 }
 
-async function getWhisper(app, key, gpu) {
-  if (whisper && currentModelKey === key && currentGpu === gpu) return whisper;
+async function getWhisper(app, gpu) {
+  if (whisper && currentGpu === gpu) return whisper;
   if (loadingPromise) return loadingPromise;
 
   loadingPromise = (async () => {
-    // Reconfiguration (model or GPU changed): free the old instance first.
+    // Reconfiguration (GPU changed): free the old instance first.
     if (whisper) await resetWhisper();
 
-    const modelPath = resolveModelPath(app, key);
+    const modelPath = resolveModelPath(app);
     if (!fs.existsSync(modelPath)) {
       throw new Error(`Speech-to-text model not found at ${modelPath}`);
     }
@@ -180,7 +121,6 @@ async function getWhisper(app, key, gpu) {
       whisper = new Whisper(modelPath, { gpu: false });
       currentGpu = false;
     }
-    currentModelKey = key;
     return whisper;
   })();
 
@@ -188,7 +128,6 @@ async function getWhisper(app, key, gpu) {
     return await loadingPromise;
   } catch (err) {
     whisper = null;
-    currentModelKey = null;
     currentGpu = null;
     throw err;
   } finally {
@@ -198,26 +137,16 @@ async function getWhisper(app, key, gpu) {
 
 // Snapshot of transcription config for the settings UI.
 function transcriptionInfo(app, settings) {
-  const installed = installedModels(app);
   const t = (settings && settings.transcription) || {};
-  const requested = t.model || 'auto';
   const threads = Number.isInteger(Number(t.threads)) && Number(t.threads) >= 1 ? Number(t.threads) : 0;
   return {
     cores: LOGICAL_CORES,
-    recommended: recommendModel(LOGICAL_CORES),
-    requested,
-    resolved: pickModelKey(installed, requested, LOGICAL_CORES),
     gpu: t.gpu !== false,
     threads, // 0 means "auto"
     defaultThreads: DEFAULT_THREADS,
-    models: MODEL_ORDER.map((k) => ({
-      key: k,
-      file: MODELS[k].file,
-      size: MODELS[k].size,
-      label: MODELS[k].label,
-      url: MODEL_BASE_URL + MODELS[k].file,
-      installed: installed.includes(k),
-    })),
+    model: MODEL_FILENAME,
+    modelSize: MODEL_SIZE,
+    installed: isModelAvailable(app),
   };
 }
 
@@ -363,28 +292,21 @@ function cleanTranscript(text) {
  * Transcribe 16kHz mono PCM samples to text.
  * @param {Float32Array} pcm - mono Float32 samples at 16kHz
  * @param {object} app - the Electron app object (for path resolution)
- * @returns {Promise<string>} the transcribed, cleaned text (one sentence per line)
- */
-/**
- * Transcribe 16kHz mono PCM samples to text.
- * @param {Float32Array} pcm - mono Float32 samples at 16kHz
- * @param {object} app - the Electron app object (for path resolution)
  * @param {object} [settings] - app settings; settings.transcription may carry
- *   { model: 'auto'|'tiny'|'base'|'small', gpu: boolean, threads: number }
+ *   { gpu: boolean, threads: number }
  * @returns {Promise<string>} the transcribed, cleaned text (one sentence per line)
  */
 async function transcribePcm(pcm, app, settings = {}) {
   if (!pcm || pcm.length === 0) {
     throw new Error('No audio captured');
   }
-  const key = resolveModelKey(app, settings);
-  if (!key) {
-    throw new Error('No speech-to-text model installed');
+  if (!isModelAvailable(app)) {
+    throw new Error('Speech-to-text model is not installed');
   }
   const t = (settings && settings.transcription) || {};
   const gpu = t.gpu !== false; // default to GPU (whisper.cpp falls back to CPU if unavailable)
   const nThreads = computeThreads(t.threads);
-  const w = await getWhisper(app, key, gpu);
+  const w = await getWhisper(app, gpu);
   const task = await w.transcribe(pcm, {
     // Fix the language to English (skips Whisper's language-detection pass).
     language: 'en',
@@ -410,15 +332,9 @@ async function transcribePcm(pcm, app, settings = {}) {
 
 module.exports = {
   MODEL_FILENAME,
-  MODELS,
-  MODEL_ORDER,
-  MODEL_BASE_URL,
-  DEFAULT_MODEL_KEY,
-  recommendModel,
-  pickModelKey,
+  MODEL_URL,
+  MODEL_SIZE,
   computeThreads,
-  installedModels,
-  resolveModelKey,
   resolveModelPath,
   isModelAvailable,
   transcriptionInfo,

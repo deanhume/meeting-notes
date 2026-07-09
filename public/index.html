@@ -269,9 +269,7 @@
         </div>
         <div class="field hidden" id="transcriptionSettings">
           <label>Voice Transcription</label>
-          <p class="field-help">Pick the on-device speech model. Larger models are more accurate but need a faster CPU — lighter ones keep up better on laptops.</p>
-          <select id="transcriptionModelSelect"></select>
-          <p class="field-note" id="transcriptionModelNote"></p>
+          <p class="field-help">On-device speech-to-text uses the bundled Whisper "small" model. It's accurate but CPU-heavy — the options below help it keep up on slower machines.</p>
           <label class="checkbox-row">
             <input type="checkbox" id="transcriptionGpuInput">
             Use GPU acceleration when available

@@ -983,22 +983,6 @@ async function loadTranscriptionSettings() {
     const info = await window.electronAPI.transcriptionInfo();
     section.classList.remove('hidden');
 
-    const select = document.getElementById('transcriptionModelSelect');
-    select.innerHTML = '';
-    const recommended = info.models.find((m) => m.key === info.recommended);
-    const autoOption = document.createElement('option');
-    autoOption.value = 'auto';
-    autoOption.textContent = `Auto (recommended: ${recommended ? recommended.key : info.recommended})`;
-    select.appendChild(autoOption);
-    info.models.forEach((m) => {
-      const opt = document.createElement('option');
-      opt.value = m.key;
-      const status = m.installed ? 'installed' : 'not downloaded';
-      opt.textContent = `${m.label} · ${m.size} (${status})`;
-      select.appendChild(opt);
-    });
-    select.value = info.requested || 'auto';
-
     document.getElementById('transcriptionGpuInput').checked = info.gpu !== false;
 
     const threadsInput = document.getElementById('transcriptionThreadsInput');
@@ -1006,27 +990,8 @@ async function loadTranscriptionSettings() {
     threadsInput.value = String(info.threads || 0);
     document.getElementById('transcriptionThreadsNote').textContent =
       `0 = auto (${info.defaultThreads} of ${info.cores} logical cores).`;
-
-    updateTranscriptionModelNote();
-    select.onchange = updateTranscriptionModelNote;
   } catch (e) {
     section.classList.add('hidden');
-  }
-}
-
-function updateTranscriptionModelNote() {
-  const note = document.getElementById('transcriptionModelNote');
-  const select = document.getElementById('transcriptionModelSelect');
-  const key = select.value;
-  if (key === 'auto') {
-    note.textContent = 'Picks the best installed model for this machine automatically.';
-    return;
-  }
-  const opt = select.options[select.selectedIndex];
-  if (opt && opt.textContent.includes('not downloaded')) {
-    note.textContent = `Not downloaded yet. Run: npm run fetch-model -- ${key}`;
-  } else {
-    note.textContent = '';
   }
 }
 
@@ -1058,7 +1023,6 @@ async function saveSettingsModal() {
     if (window.electronAPI && window.electronAPI.saveTranscriptionSettings) {
       const threadsRaw = parseInt(document.getElementById('transcriptionThreadsInput').value, 10);
       await window.electronAPI.saveTranscriptionSettings({
-        model: document.getElementById('transcriptionModelSelect').value,
         gpu: document.getElementById('transcriptionGpuInput').checked,
         threads: Number.isNaN(threadsRaw) ? 0 : threadsRaw,
       });
