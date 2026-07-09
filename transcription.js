@@ -122,6 +122,82 @@ function toSentenceLines(text) {
   return sentences.map((s) => s.trim()).filter(Boolean).join('\n');
 }
 
+// ── Whole-transcript finalisation (for summarisation) ─────────
+// cleanTranscript above tidies a single Whisper chunk. finalizeTranscript runs
+// over the *accumulated* transcript once recording has produced many chunks, to
+// undo two artefacts that hurt the summariser:
+//   1. Every appended chunk is force-terminated with a "." (see transcript-append),
+//      so utterances Whisper split across audio windows become false sentence
+//      boundaries. We re-join fragments that clearly trail off mid-thought.
+//   2. Conversational backchannel ("Yeah.", "Exactly.", "Bye.") floods the
+//      transcript and dilutes TextRank centrality. We drop backchannel-only lines.
+// It is deliberately conservative (merges at most two adjacent fragments, only on
+// high-confidence continuation cues) so it never fabricates run-on sentences.
+
+// A line made up solely of these acknowledgement words carries no meeting content.
+const BACKCHANNEL_WORDS = new Set(('yeah yes yep yup no nope nah ok okay k right exactly sure cool nice '
+  + 'great good fine thanks thank you bye goodbye cheers absolutely alright wow oh oops hmm mhm mmhm '
+  + 'huh haha lol well so um uh er erm ah eh definitely totally agreed correct indeed maybe perhaps '
+  + 'hello hi hey mate man guys please welcome').split(/\s+/));
+
+// A connective/pronoun a chunk tends to end on when one sentence was split across
+// two audio windows ("...I can't" + "risk this"). Used to re-join those fragments.
+const CONTINUATION_WORD = new Set(('and but so or to with of in on for that because the a an is are was '
+  + 'were will would can cant cannot could should i we you he she they my our your this these those '
+  + 'if when then at as by from into over after before about').split(/\s+/));
+
+function isBackchannelLine(line) {
+  const words = line.toLowerCase().match(/[a-z']+/g) || [];
+  if (words.length === 0) return true;
+  return words.every((w) => BACKCHANNEL_WORDS.has(w));
+}
+
+function stripTerminalPunct(s) {
+  const out = s.replace(/["')\]]*\s*[.!?]+["')\]]*\s*$/, '').trim();
+  return out || s.trim();
+}
+
+function lastWordOf(s) {
+  const m = s.toLowerCase().match(/[a-z']+/g);
+  return m ? m[m.length - 1].replace(/'/g, '') : '';
+}
+
+// A fragment should be merged into the previous one when the previous fragment
+// clearly hasn't finished — it ends on a comma/semicolon or a dangling connective.
+function isIncompleteFragment(prev) {
+  const core = stripTerminalPunct(prev);
+  if (/[,;:]$/.test(core)) return true;
+  return CONTINUATION_WORD.has(lastWordOf(core));
+}
+
+function finalizeTranscript(text) {
+  if (!text) return '';
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .filter((l) => !isBackchannelLine(l));
+
+  const merged = [];
+  let run = 0; // consecutive merges onto the current tail — capped so we never
+  //             chain more than two fragments into one sentence.
+  for (const line of lines) {
+    if (merged.length && run < 1 && isIncompleteFragment(merged[merged.length - 1])) {
+      const tail = stripTerminalPunct(merged[merged.length - 1]).replace(/[,;:]$/, '');
+      merged[merged.length - 1] = `${tail} ${line}`;
+      run += 1;
+    } else {
+      merged.push(line);
+      run = 0;
+    }
+  }
+
+  let out = merged.join(' ');
+  out = collapseRepeats(out);
+  out = normalizeWhitespace(out);
+  return toSentenceLines(out);
+}
+
 /**
  * Full cleanup pipeline: apply all post-processing steps to raw Whisper output.
  * Exported so it can be unit-tested without loading the native Whisper addon.
@@ -176,4 +252,5 @@ module.exports = {
   isModelAvailable,
   transcribePcm,
   cleanTranscript,
+  finalizeTranscript,
 };

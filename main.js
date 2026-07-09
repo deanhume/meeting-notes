@@ -277,10 +277,14 @@ ipcMain.handle('transcript-append', (_event, text) => {
   return true;
 });
 
-// Read back the full transcript so far (used to produce a summary at recording stop)
+// Read back the full transcript so far (used to produce a summary at recording stop).
+// The on-disk file keeps the raw per-chunk lines as an audit trail; here we return
+// a finalised version (backchannel dropped, chunk-seam fragments re-joined) so the
+// summariser works from cleaner input.
 ipcMain.handle('transcript-read', () => {
   if (!currentTranscriptPath || !fs.existsSync(currentTranscriptPath)) return '';
-  return fs.readFileSync(currentTranscriptPath, 'utf8');
+  const raw = fs.readFileSync(currentTranscriptPath, 'utf8');
+  return transcription.finalizeTranscript(raw);
 });
 
 // ── Electron lifecycle ────────────────────────────────────────
