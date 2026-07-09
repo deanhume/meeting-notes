@@ -267,6 +267,21 @@
           </div>
           <p class="field-note" id="dataLocationNote"></p>
         </div>
+        <div class="field hidden" id="transcriptionSettings">
+          <label>Voice Transcription</label>
+          <p class="field-help">Pick the on-device speech model. Larger models are more accurate but need a faster CPU — lighter ones keep up better on laptops.</p>
+          <select id="transcriptionModelSelect"></select>
+          <p class="field-note" id="transcriptionModelNote"></p>
+          <label class="checkbox-row">
+            <input type="checkbox" id="transcriptionGpuInput">
+            Use GPU acceleration when available
+          </label>
+          <div class="data-location-input">
+            <label for="transcriptionThreadsInput">CPU threads</label>
+            <input type="number" id="transcriptionThreadsInput" min="0" step="1" style="max-width: 6rem;">
+          </div>
+          <p class="field-note" id="transcriptionThreadsNote"></p>
+        </div>
         <div class="field">
           <label>Version</label>
           <p class="version-display" id="versionDisplay">v1.1.5</p>

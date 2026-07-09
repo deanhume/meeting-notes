@@ -23,7 +23,15 @@
    npm run fetch-model
    ```
    This downloads `models/ggml-base.bin` (~140 MB). It is not committed to git. The
-   Record button in the note editor stays hidden until this model is present.
+   Record button in the note editor stays hidden until a model is present.
+
+   Other model tiers can be fetched by passing a key: `npm run fetch-model -- tiny`
+   (~75 MB), `npm run fetch-model -- small` (~466 MB). Larger models are more accurate
+   but need a faster CPU. The active model is chosen in **Settings ▸ Voice Transcription**
+   — pick a specific tier or leave it on **Auto**, which selects the best *installed*
+   model for the machine's CPU core count. GPU acceleration is enabled by default and
+   falls back to CPU automatically if unavailable. Thread count is auto-tuned (~75% of
+   logical cores) but can be overridden there too.
 
 ## Running in Development Mode
 

@@ -1,4 +1,11 @@
-const { cleanTranscript, finalizeTranscript } = require('../transcription');
+const {
+  cleanTranscript,
+  finalizeTranscript,
+  recommendModel,
+  pickModelKey,
+  computeThreads,
+  MODEL_ORDER,
+} = require('../transcription');
 
 // cleanTranscript is pure text processing — no native Whisper addon is loaded,
 // so these tests run anywhere the rest of the suite does.
@@ -121,5 +128,81 @@ describe('finalizeTranscript', () => {
     expect(lines.length).toBe(2);
     expect(lines[0]).toBe('We are going to And then we will.');
     expect(lines[1]).toBe('Ship the product tomorrow.');
+  });
+});
+
+describe('recommendModel', () => {
+  test('picks tiny for low core counts', () => {
+    expect(recommendModel(1)).toBe('tiny');
+    expect(recommendModel(4)).toBe('tiny');
+  });
+
+  test('picks base for mid core counts', () => {
+    expect(recommendModel(5)).toBe('base');
+    expect(recommendModel(8)).toBe('base');
+  });
+
+  test('picks small for high core counts', () => {
+    expect(recommendModel(12)).toBe('small');
+    expect(recommendModel(24)).toBe('small');
+  });
+});
+
+describe('pickModelKey', () => {
+  test('returns null when nothing is installed', () => {
+    expect(pickModelKey([], 'auto', 8)).toBeNull();
+    expect(pickModelKey(null, 'base', 8)).toBeNull();
+  });
+
+  test('honours an explicit installed choice', () => {
+    expect(pickModelKey(['tiny', 'base', 'small'], 'tiny', 24)).toBe('tiny');
+    expect(pickModelKey(['tiny', 'base', 'small'], 'small', 2)).toBe('small');
+  });
+
+  test('auto targets the recommended tier when installed', () => {
+    expect(pickModelKey(['tiny', 'base', 'small'], 'auto', 24)).toBe('small');
+    expect(pickModelKey(['tiny', 'base', 'small'], 'auto', 8)).toBe('base');
+    expect(pickModelKey(['tiny', 'base', 'small'], 'auto', 2)).toBe('tiny');
+  });
+
+  test('auto falls back to the closest installed model at or below the target', () => {
+    // 24 cores wants small, but only base/tiny installed → base.
+    expect(pickModelKey(['tiny', 'base'], 'auto', 24)).toBe('base');
+    // 8 cores wants base, only tiny installed → tiny.
+    expect(pickModelKey(['tiny'], 'auto', 8)).toBe('tiny');
+  });
+
+  test('an uninstalled explicit choice falls back like auto', () => {
+    // small requested but not installed → closest at/below (base).
+    expect(pickModelKey(['tiny', 'base'], 'small', 8)).toBe('base');
+  });
+
+  test('falls back upward when nothing at/below the target is installed', () => {
+    // tiny requested/target but only small installed → small.
+    expect(pickModelKey(['small'], 'auto', 2)).toBe('small');
+  });
+});
+
+describe('computeThreads', () => {
+  const cores = require('os').cpus().length;
+
+  test('clamps an explicit thread count to the core count', () => {
+    expect(computeThreads(2)).toBe(2);
+    expect(computeThreads(9999)).toBe(cores);
+  });
+
+  test('falls back to the default for invalid or zero values', () => {
+    const def = computeThreads(0);
+    expect(computeThreads('nonsense')).toBe(def);
+    expect(computeThreads(-1)).toBe(def);
+    expect(computeThreads(null)).toBe(def);
+    expect(def).toBeGreaterThanOrEqual(1);
+    expect(def).toBeLessThanOrEqual(cores);
+  });
+});
+
+describe('MODEL_ORDER', () => {
+  test('is ordered lightest to heaviest', () => {
+    expect(MODEL_ORDER).toEqual(['tiny', 'base', 'small']);
   });
 });

@@ -7,7 +7,7 @@ Electron desktop app for tracking meeting notes about people in your organizatio
 ```bash
 npm start          # Launch the Electron app (alias: npm run dev)
 npm run web        # Run as a standalone Express server at http://localhost:3000
-npm run fetch-model # Download the Whisper STT model (~140 MB) into models/
+npm run fetch-model # Download the Whisper STT model (~140 MB) into models/; pass a tier key to pick another, e.g. `npm run fetch-model -- small`
 npm test           # Run the full Jest suite
 npm run build      # Build the Windows NSIS installer (electron-builder)
 ```
@@ -28,7 +28,7 @@ The core design is a **single API route factory shared by two hosts**:
 - `shared.js` exports `createApiRoutes(expressApp, { dataDir })` plus validation/helpers. This is the only place API endpoints and persistence logic live.
 - `main.js` (Electron main process) creates the `BrowserWindow`, starts an embedded Express server, and calls `createApiRoutes`. Settings/data live under the Electron `userData` dir (`%APPDATA%/meeting-notes/`).
 - `server.js` is a thin standalone Express host for web mode that calls the same `createApiRoutes`.
-- `preload.js` is the IPC bridge; the renderer runs with `nodeIntegration: false` and `contextIsolation: true`, so only explicitly exposed APIs reach the frontend. It exposes exactly `window.electronAPI.{selectFolder, transcriptionAvailable, transcribeAudio}` via `contextBridge` — add any new renderer↔main capability here plus a matching `ipcMain.handle` in `main.js`.
+- `preload.js` is the IPC bridge; the renderer runs with `nodeIntegration: false` and `contextIsolation: true`, so only explicitly exposed APIs reach the frontend. It exposes exactly `window.electronAPI.{selectFolder, transcriptionAvailable, transcribeAudio, transcriptionInfo, saveTranscriptionSettings}` (plus any update-related methods) via `contextBridge` — add any new renderer↔main capability here plus a matching `ipcMain.handle` in `main.js`.
 - `transcription.js` (Electron main process only) wraps `smart-whisper` (whisper.cpp) for fully on-device speech-to-text. The Whisper model is loaded lazily on first use and kept resident. Voice/transcription is Electron-only — it is **not** available in web mode.
 - `public/js/app.js` is all frontend logic (DOM manipulation, `fetch` calls, theme, modals). `public/css/style.css` holds theming via CSS custom properties.
 - `public/js/summarizer.js` turns a raw transcript into bullet points using a fully on-device **extractive** algorithm (sentence cleanup + TextRank-style similarity scoring + signal boosting) — no LLM, no network. It is a **dual-mode module**: it attaches to `window` for the browser and also `module.exports` its functions (guarded by `typeof module !== 'undefined'`) so it can be unit-tested in Node without a browser. Keep this dual export when editing.
@@ -42,7 +42,7 @@ JSON files in the configured data dir:
 - `people.json` — array of `{id, name, role, team, createdAt}`
 - `questions.json` — array of discussion questions
 - `notes_<personId>.json` — array of `{id, title, content, tags, createdAt, updatedAt}` per person
-- `settings.json` — data location + theme (Electron only)
+- `settings.json` — data location + theme + transcription config (Electron only). Transcription shape: `transcription: { model: 'auto'|'tiny'|'base'|'small', gpu: boolean, threads: 0|N }` (0 threads = auto).
 
 Key API surface: `/api/people`, `/api/people/:id/notes`, `/api/questions`, `/api/tags`, `/api/settings`.
 
@@ -55,7 +55,8 @@ Key API surface: `/api/people`, `/api/people/:id/notes`, `/api/questions`, `/api
 - **HTTP**: 200/201 success, 400 validation (`{ error: "message" }`), 404 not found.
 - **Cascading delete**: deleting a person must remove their `notes_<id>.json` file.
 - **No async/await** in the persistence layer — file I/O is synchronous by design. (Transcription in `transcription.js` is the exception: it is async because Whisper is.)
-- **Voice transcription**: audio is captured in the renderer, downsampled to 16kHz mono Float32 PCM, and sent via `transcribeAudio` IPC; transcription runs on-device and never leaves the machine. The resulting transcript can be condensed into bullet points by `summarizeToBullets` in `public/js/summarizer.js` (also on-device). The Record button stays hidden until `transcriptionAvailable` reports the model (`models/ggml-base.bin`) is present.
+- **Voice transcription**: audio is captured in the renderer, downsampled to 16kHz mono Float32 PCM, and sent via `transcribeAudio` IPC; transcription runs on-device and never leaves the machine. The resulting transcript can be condensed into bullet points by `summarizeToBullets` in `public/js/summarizer.js` (also on-device). The Record button stays hidden until `transcriptionAvailable` reports that at least one model (e.g. `models/ggml-base.bin`) is present.
+- **Whisper model selection** (`transcription.js`): a `MODELS` registry maps keys (`tiny`→`ggml-tiny.en.bin`, `base`→`ggml-base.bin`, `small`→`ggml-small.en.bin`) ordered by size in `MODEL_ORDER`. Model files are searched across `modelDirs(app)` (userData/models → packaged resources/models → ./models). `recommendModel(cores)` backs "Auto" (≤4 cores→tiny, ≤8→base, else small); `pickModelKey(installed, requested, cores)` is the pure, unit-tested choice logic (honours an explicit installed choice, else falls back to the closest installed tier ≤ target, then upward). `computeThreads` clamps an explicit thread count to the core count or defaults to ~75% of logical cores. Whisper is loaded via `getWhisper(app, key, gpu)` with `gpu:true` by default (whisper.cpp falls back to CPU internally); `resetWhisper()` frees the resident instance when settings change. Config is surfaced to the UI via `transcriptionInfo(app, settings)` and the `transcription-info` / `save-transcription-settings` IPC channels (bridged in `preload.js` as `transcriptionInfo` / `saveTranscriptionSettings`). `npm run fetch-model -- <key>` downloads a specific tier. Keep `fetch-model.js`'s MODELS map in sync with `transcription.js`.
 - **Frontend**: vanilla JS only; modal-based create/edit; toggle visibility with the `hidden` class; persist UI prefs (theme) in `localStorage`; notes shown newest-first; autosave fires every 20 keystrokes.
 
 ## Adding an endpoint
