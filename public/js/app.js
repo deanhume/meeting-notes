@@ -1315,21 +1315,33 @@ const LIVE_CHUNK_MS = 5000;    // Attempt a transcription chunk every 5 seconds
 const LIVE_MIN_CHUNK_SAMPLES = SAMPLE_RATE * 2;    // Need at least 2s of new audio per chunk
 const LIVE_EDGE_GUARD_SAMPLES = SAMPLE_RATE * 0.8; // Leave ~0.8s unprocessed to avoid cutting mid-word
 
-// Recording-duration thresholds: warn the user as they approach limits where
-// transcription becomes slow and memory-heavy
-const RECORD_WARN_SECONDS = 13 * 60;  // Show "consider stopping" at 13 min
-const RECORD_HARD_SECONDS = 15 * 60;  // Show "very long" warning at 15 min
-
-// Check if transcription is possible (Electron + Whisper model present + browser audio APIs)
+// Check if transcription is possible (Electron + on-device transcriber + browser audio APIs).
+// Transcription runs in the renderer (Transformers.js/WebGPU) but still relies on the
+// Electron-only transcript-file IPC to build the live summary, so it stays desktop-only.
 function transcriptionSupported() {
-  return !!(window.electronAPI && window.electronAPI.transcribeAudio &&
+  return !!(window.rendererTranscription && window.electronAPI && window.electronAPI.transcriptStart &&
     navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+}
+
+// transcriber.js is a deferred ES module (it imports Transformers.js), so it may
+// finish loading *after* init() runs. Resolve once its API is available, falling
+// back after a timeout for hosts where it never loads (e.g. web mode).
+function transcriptionReady() {
+  if (window.rendererTranscription) return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => { if (!settled) { settled = true; resolve(); } };
+    window.addEventListener('rendererTranscriptionReady', finish, { once: true });
+    setTimeout(finish, 15000);
+  });
 }
 
 // Show the Record button only when transcription is fully available
 async function wireRecordButton() {
   const btn = document.getElementById('recordBtn');
-  if (!btn || !transcriptionSupported()) return; // stays hidden (e.g. web mode)
+  if (!btn) return;
+  await transcriptionReady(); // the transcription engine loads asynchronously
+  if (!transcriptionSupported()) return; // stays hidden (e.g. web mode)
   try {
     const available = await window.electronAPI.transcriptionAvailable();
     if (!available) return; // model not present — keep hidden
@@ -1428,6 +1440,9 @@ async function startRecording() {
   } catch (e) {
     console.error('Could not start transcript file:', e);
   }
+  // Start loading the on-device model now (if not already resident) so the first
+  // live chunk doesn't wait on the full model load.
+  if (window.rendererTranscription) window.rendererTranscription.warmup();
   mediaRecorder = new MediaRecorder(recordStream);
   // A 1s timeslice makes data available regularly so the cumulative blob keeps
   // growing and can be transcribed mid-recording.
@@ -1451,31 +1466,6 @@ function updateRecordTimer() {
   const s = String(elapsed % 60).padStart(2, '0');
   const live = liveWordCount ? ` · transcribing ${liveWordCount}w` : '';
   setRecordStatus(`Recording ${m}:${s}${live}`);
-  updateRecordWarning(elapsed);
-}
-
-// Warn as the recording approaches the ~15 min point, where transcription
-// becomes slow and memory-heavy.
-function updateRecordWarning(elapsed) {
-  const warning = document.getElementById('recordWarning');
-  if (elapsed >= RECORD_HARD_SECONDS) {
-    warning.textContent = '⚠ Very long recording — transcription will be slow & memory-heavy';
-    warning.classList.remove('hidden');
-    warning.classList.add('severe');
-  } else if (elapsed >= RECORD_WARN_SECONDS) {
-    const remaining = Math.max(0, Math.ceil((RECORD_HARD_SECONDS - elapsed) / 60));
-    warning.textContent = `⚠ Approaching ${RECORD_HARD_SECONDS / 60} min — consider stopping soon (~${remaining} min left)`;
-    warning.classList.remove('hidden', 'severe');
-  } else {
-    clearRecordWarning();
-  }
-}
-
-function clearRecordWarning() {
-  const warning = document.getElementById('recordWarning');
-  warning.classList.add('hidden');
-  warning.classList.remove('severe');
-  warning.textContent = '';
 }
 
 function stopRecording() {
@@ -1532,7 +1522,6 @@ async function handleRecordingStop() {
   const btn = document.getElementById('recordBtn');
   btn.classList.remove('recording');
   document.getElementById('recordBtnLabel').textContent = 'Record';
-  clearRecordWarning();
   cleanupRecordStream(); // also stops the live-chunk interval
 
   if (!recordedChunks.length) { setRecordStatus(''); resolveStopWaiters(); return; }
@@ -1587,7 +1576,8 @@ async function transcribeLiveChunk(force) {
       const chunkPcm = new Float32Array(pcm.subarray(processedSamples, cut));
       if (!chunkPcm.length) return;
 
-      const text = await window.electronAPI.transcribeAudio(chunkPcm);
+      const raw = await window.rendererTranscription.transcribe(chunkPcm);
+      const text = window.cleanTranscript(raw);
       processedSamples = cut;
       // Write the transcribed chunk to the transcript file (append, performant).
       // The rolling summary is produced separately by refreshSummaryFromFile().

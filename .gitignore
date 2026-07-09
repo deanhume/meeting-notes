@@ -74,6 +74,10 @@ web_modules/
 
 # Whisper speech-to-text models (large binaries, fetched/bundled separately)
 models/*.bin
+# On-device transcription assets prepared by `npm run fetch-model` (model + vendored
+# Transformers.js/ONNX runtime). Large and reproducible, so not committed.
+public/models/
+public/vendor/
 
 # Phase 0 spike scratch artifacts
 spike/

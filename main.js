@@ -168,7 +168,24 @@ function startServer() {
     const settings = loadSettings();
 
     expressApp.use(express.json());
+
+    // Cross-origin isolation lets ONNX Runtime Web use multi-threaded WASM for the
+    // CPU transcription fallback (where WebGPU is unavailable). All app resources
+    // are same-origin, so require-corp is safe here.
+    expressApp.use((req, res, next) => {
+      res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+      res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+      next();
+    });
+
     expressApp.use(express.static(path.join(__dirname, 'public')));
+
+    // In packaged builds the ONNX model ships as an extra resource (outside the
+    // asar, to keep the archive small); serve it at the same /models path the
+    // renderer expects. In dev the model lives in public/models (served above).
+    if (app.isPackaged) {
+      expressApp.use('/models', express.static(path.join(process.resourcesPath, 'models')));
+    }
 
     // Mount all API routes using the shared route factory
     createApiRoutes(expressApp, {
@@ -206,15 +223,9 @@ ipcMain.handle('select-folder', async () => {
   return null;
 });
 
-// Reports whether local speech-to-text is available (at least one Whisper model present)
+// Reports whether local speech-to-text is available (the bundled ONNX model is present).
 ipcMain.handle('transcription-available', () => {
   return transcription.isModelAvailable(app);
-});
-
-// Transcribe 16kHz mono PCM audio to text using on-device Whisper. GPU
-// acceleration is enabled by default (falls back to CPU if unavailable).
-ipcMain.handle('transcribe-audio', async (_event, pcm) => {
-  return transcription.transcribePcm(pcm, app, loadSettings());
 });
 
 // Return the current auto-update status to the renderer (polled from settings modal)

@@ -739,17 +739,6 @@ body.light-theme .theme-toggle-thumb {
   margin-left: 4px;
 }
 
-.record-warning {
-  font-size: 12px;
-  font-weight: 600;
-  color: #b8860b;
-  margin-left: 6px;
-}
-
-.record-warning.severe {
-  color: #c0504d;
-}
-
 #noteWritePane textarea {
   border-top-left-radius: 0;
   border-top-right-radius: 0;

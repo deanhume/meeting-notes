@@ -21,9 +21,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
 
-  // Transcription: check model availability and transcribe audio buffers
+  // Transcription: check whether the on-device model is installed (gates the
+  // Record button). Transcription itself runs in the renderer (see transcriber.js).
   transcriptionAvailable: () => ipcRenderer.invoke('transcription-available'),
-  transcribeAudio: (pcm) => ipcRenderer.invoke('transcribe-audio', pcm),
 
   // Transcript file: start/append/read the on-disk transcript during recording
   transcriptStart: (noteId) => ipcRenderer.invoke('transcript-start', noteId),

@@ -22,12 +22,13 @@
    ```bash
    npm run fetch-model
    ```
-   This downloads `models/ggml-small.en.bin` (~466 MB). It is not committed to git,
-   but the build bundles it into the installer so end users never download anything.
-   The Record button in the note editor stays hidden until the model is present.
-   GPU acceleration is enabled by default and falls back to CPU automatically if
-   unavailable; thread count is auto-tuned (~75% of logical cores). Transcription is
-   fully automatic — there are no user-facing transcription settings.
+   This downloads the quantised (q4) Whisper-small.en ONNX model (~290 MB) into
+   `public/models/whisper-small.en/`. It is not committed to git, but the build
+   bundles it into the installer so end users never download anything. The Record
+   button in the note editor stays hidden until the model is present. Transcription
+   runs in the renderer via Transformers.js + ONNX Runtime Web — on the GPU (WebGPU)
+   where available, falling back to CPU (WASM) automatically. It is fully automatic —
+   there are no user-facing transcription settings.
 
 ## Running in Development Mode
 

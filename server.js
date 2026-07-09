@@ -16,6 +16,15 @@ const PORT = 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 
 app.use(express.json());
+
+// Cross-origin isolation (parity with the Electron host) so ONNX Runtime Web can
+// use multi-threaded WASM. All resources are same-origin, so require-corp is safe.
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Mount the shared API routes (same ones Electron uses)

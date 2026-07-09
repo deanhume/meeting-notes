@@ -197,7 +197,6 @@
                 <span class="record-dot"></span><span id="recordBtnLabel">Record</span>
               </button>
               <span class="record-status" id="recordStatus" aria-live="polite"></span>
-              <span class="record-warning hidden" id="recordWarning" aria-live="polite"></span>
             </div>
             <textarea id="noteContentInput" placeholder="What was discussed, decisions made, action items…" rows="12"></textarea>
           </div>
@@ -287,6 +286,16 @@
 
   <script src="/js/markdown.js"></script>
   <script src="/js/summarizer.js"></script>
+  <script src="/js/transcript-clean.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "onnxruntime-common": "/vendor/transformers/ort-common/index.js",
+      "onnxruntime-web/webgpu": "/vendor/transformers/ort.webgpu.bundle.min.mjs"
+    }
+  }
+  </script>
+  <script type="module" src="/js/transcriber.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>
