@@ -1,6 +1,6 @@
 {
   "name": "meeting-notes",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Local meeting notes tracker",
   "main": "main.js",
   "author": "Dean Hume",
@@ -39,6 +39,7 @@
       "main.js",
       "preload.js",
       "transcription.js",
+      "transcript-file.js",
       "server.js",
       "shared.js",
       "public/**/*",
