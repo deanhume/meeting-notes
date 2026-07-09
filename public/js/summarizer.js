@@ -40,6 +40,24 @@ const DECISION_CUE = /\b(?:decid\w*|agree\w*|go(?:ing)? with|conclu\w*|final\w*|
 // meeting rather than its substance. These are down-weighted.
 const NAVIGATION_CUE = /\b(?:next slide|previous slide|this slide|the slide|left[\s-]?hand side|right[\s-]?hand side|hand (?:it )?over|hand over|toss it (?:to|over)|walk you through|move (?:on )?to (?:the )?(?:next|previous|slide)|go back to (?:the )?previous|go ahead|introduce yourself|put a pin)\b/i;
 
+// Off-topic small talk — weather, sport, holidays, food, family chit-chat. These
+// sentences are pushed down so the meeting's substance isn't buried by pleasantries.
+const SMALLTALK_CUE = /\b(?:weather|surf(?:ing|ed)?|swim(?:ming)?|swam|crab|crabs|beach|ocean|lake|sea|sunny|sunshine|summer|winter|degrees|holiday|vacation|global war\w*|weekend|football|coffee|lunch|dinner|crystal clear|open[\s-]?water)\b/i;
+
+// Personal-commitment cues used to detect action items — a first-person owner
+// ("I'll", "let me", "I need to") paired with a task verb, or an explicit
+// "action item" / "take a note" phrase. Kept separate from ranking so genuine
+// follow-ups surface even when they aren't the most central sentences.
+const COMMIT_CUE = /\b(?:i'?ll|we'?ll|i will|we will|i'?m going to|i am going to|i'?m gonna|i need to|we need to|let me|i can|i'?ve got to|assign(?:ed)?|responsible for)\b/i;
+const TASK_VERB = /\b(?:check|double[\s-]?check|find out|chase|take (?:a |an |your |some )?(?:note|notes|action)|look into|pull|send|follow[\s-]?up|re-?read|investigate|confirm|verify|report back|get (?:some )?(?:data|numbers|extra)|dig into|take care of)\b/i;
+const EXPLICIT_ACTION = /\b(?:action item|to-?do|take (?:a |an )?action|follow[\s-]?up|next step)\b/i;
+
+// Words a truncated ASR fragment tends to trail off on ("...we're not going with
+// any video, I can't.", "...who to go."). Sentences ending here are down-weighted.
+const DANGLING_END = new Set(('and but so or to with the a an of in on for that i we you he she they '
+  + 'is are was were will would can cant cannot could should cnt now then when if because '
+  + 'dont wont couldnt shouldnt wouldnt havent isnt whos').split(/\s+/));
+
 // Lowercase word tokens (used for salience, similarity and length checks).
 function summaryWords(s) {
   return (s.toLowerCase().match(/[a-z0-9']+/g) || []);
@@ -207,6 +225,8 @@ function signalBoost(sentence) {
 
   // Push presentation/navigation chatter to the bottom.
   if (NAVIGATION_CUE.test(sentence)) boost *= 0.35;
+  // Bury off-topic small talk (weather, sport, holidays) below meeting substance.
+  if (SMALLTALK_CUE.test(sentence)) boost *= 0.25;
   return boost;
 }
 
@@ -223,52 +243,42 @@ function isNavigationOnly(sentence) {
   );
 }
 
-/**
- * Summarise a meeting transcript into a single flat Markdown bullet list.
- * @param {string} transcript - the (cleaned) transcript text
- * @returns {string} newline-joined "- bullet" lines, or '' when there's nothing
- */
-function summarizeToBullets(transcript) {
-  const clean = (transcript || '').replace(/[ \t]+/g, ' ').trim();
-  if (!clean) return '';
+// A sentence that is *only* off-topic small talk — it matches a small-talk cue and
+// carries no meeting signal (no action, decision or number). Dropped from
+// candidacy so a cluster of chit-chat can't win on TextRank centrality alone.
+function isSmallTalkOnly(sentence) {
+  return (
+    SMALLTALK_CUE.test(sentence) &&
+    !isActionItem(sentence) &&
+    !DECISION_CUE.test(sentence) &&
+    !/\d/.test(sentence)
+  );
+}
 
-  // Split into sentences, break long run-ons into tighter clause units, then
-  // clean spoken disfluency / leading discourse markers from each candidate.
-  const all = splitSentences(clean)
-    .flatMap(splitRunOns)
-    .map(cleanForSummary)
-    .filter((s) => summaryWords(s).length >= 3);
+// True when a sentence reads as a personal action item / commitment: an explicit
+// "action item" / "take a note" phrase, or a first-person owner cue paired with a
+// concrete task verb ("I'll double check", "let me find out", "I can chase that").
+function isActionItem(sentence) {
+  if (EXPLICIT_ACTION.test(sentence)) return true;
+  if (/\btake (?:a |an |your |some )?(?:note|notes|action)\b/i.test(sentence)) return true;
+  return COMMIT_CUE.test(sentence) && TASK_VERB.test(sentence);
+}
 
-  // Nothing rankable — bullet the whole thing as-is.
-  if (all.length <= 1) {
-    return '- ' + tidySentence(cleanForSummary(clean));
-  }
+// Multiplicative penalty for a sentence that trails off mid-thought — a common
+// artefact of speech-to-text splitting one utterance across lines.
+function danglingPenalty(sentence) {
+  const words = summaryWords(sentence);
+  if (words.length === 0) return 1;
+  const last = words[words.length - 1].replace(/'/g, '');
+  return DANGLING_END.has(last) ? 0.45 : 1;
+}
 
-  // Drop pure navigation chatter, but only while enough real content survives;
-  // otherwise rank everything rather than emit nothing.
-  const content = all.filter((s) => !isNavigationOnly(s));
-  const sentences = content.length >= Math.min(3, all.length) ? content : all;
-
-  const sets = sentences.map((s) => new Set(contentWords(s)));
-  const ranks = textRankScores(sets);
-
-  // Final salience: centrality × meeting-signal boost, with a light positional
-  // nudge for the opening (context) and closing (wrap-up / decisions).
-  const last = sentences.length - 1;
-  const scored = sentences.map((s, i) => {
-    let score = ranks[i] * signalBoost(s);
-    if (i === 0) score *= 1.15;
-    if (i === last) score *= 1.2;
-    return { s, i, score, set: sets[i] };
-  });
-
-  // How many bullets: ~30% of sentences, clamped to a sensible 3..7.
-  const count = Math.min(7, Math.max(3, Math.round(sentences.length * 0.3)));
-
-  // Maximal Marginal Relevance: greedily pick the highest-scoring sentence that
-  // isn't too similar to what's already chosen, so bullets don't repeat.
-  const lambda = 0.7;
-  const candidates = scored.slice().sort((a, b) => b.score - a.score);
+// Greedily pick up to `count` items from `pool` by Maximal Marginal Relevance:
+// prefer high score, but discount anything too similar to what's already chosen so
+// bullets don't repeat. Returns the picks in selection (score) order.
+function selectByMMR(pool, count, lambda) {
+  if (pool.length === 0) return [];
+  const candidates = pool.slice().sort((a, b) => b.score - a.score);
   const maxScore = candidates[0].score || 1;
   const selected = [];
   while (selected.length < count && candidates.length > 0) {
@@ -289,12 +299,86 @@ function summarizeToBullets(transcript) {
     }
     selected.push(candidates.splice(bestIdx, 1)[0]);
   }
+  return selected;
+}
 
-  // Restore chronological order so the bullets read in meeting sequence.
-  return selected
-    .sort((a, b) => a.i - b.i)
-    .map((o) => '- ' + tidySentence(o.s))
-    .join('\n');
+/**
+ * Summarise a meeting transcript into a Markdown bullet list. When the transcript
+ * contains distinct discussion points *and* follow-up commitments, the output is
+ * split into a "Key points" section and an "Action items" section (both rendered
+ * as bullets so every line stays a valid Markdown list item); otherwise a single
+ * flat bullet list is returned.
+ * @param {string} transcript - the (cleaned) transcript text
+ * @returns {string} newline-joined "- bullet" lines, or '' when there's nothing
+ */
+function summarizeToBullets(transcript) {
+  const clean = (transcript || '').replace(/[ \t]+/g, ' ').trim();
+  if (!clean) return '';
+
+  // Split into sentences, break long run-ons into tighter clause units, then
+  // clean spoken disfluency / leading discourse markers from each candidate.
+  const all = splitSentences(clean)
+    .flatMap(splitRunOns)
+    .map(cleanForSummary)
+    .filter((s) => summaryWords(s).length >= 3);
+
+  // Nothing rankable — bullet the whole thing as-is.
+  if (all.length <= 1) {
+    return '- ' + tidySentence(cleanForSummary(clean));
+  }
+
+  // Candidate gate: keep sentences with real substance (>=5 words and >=3 content
+  // words), or anything carrying an action/decision signal. This drops the short
+  // backchannel fragments ("Yeah.", "Exactly right.") that speech-to-text leaks.
+  const substantive = all.filter((s) => {
+    const w = summaryWords(s).length;
+    const c = contentWords(s).length;
+    const hasSignal = isActionItem(s) || DECISION_CUE.test(s);
+    return (w >= 5 && c >= 3) || (hasSignal && w >= 4);
+  });
+
+  // Drop pure navigation / small-talk chatter, but never at the cost of emitting
+  // nothing.
+  const isChatter = (s) => isNavigationOnly(s) || isSmallTalkOnly(s);
+  let sentences = substantive.filter((s) => !isChatter(s));
+  if (sentences.length < Math.min(3, all.length)) {
+    sentences = all.filter((s) => !isChatter(s));
+  }
+  if (sentences.length === 0) sentences = all;
+
+  const sets = sentences.map((s) => new Set(contentWords(s)));
+  const ranks = textRankScores(sets);
+
+  // Final salience: centrality × meeting-signal boost × truncation penalty, with a
+  // light positional nudge for the opening (context) and closing (wrap-up).
+  const last = sentences.length - 1;
+  const scored = sentences.map((s, i) => {
+    let score = ranks[i] * signalBoost(s) * danglingPenalty(s);
+    if (i === 0) score *= 1.15;
+    if (i === last) score *= 1.2;
+    return { s, i, score, set: sets[i], action: isActionItem(s) };
+  });
+
+  // Route commitments to their own section; everything else is a key point.
+  const keyPool = scored.filter((o) => !o.action);
+  const actionPool = scored.filter((o) => o.action);
+
+  const keyCount = Math.min(7, Math.max(3, Math.round(keyPool.length * 0.3)));
+  const actionCount = Math.min(6, actionPool.length);
+
+  const keys = selectByMMR(keyPool, keyCount, 0.7).sort((a, b) => a.i - b.i);
+  const actions = selectByMMR(actionPool, actionCount, 0.6).sort((a, b) => a.i - b.i);
+
+  const keyLines = keys.map((o) => '- ' + tidySentence(o.s));
+  const actionLines = actions.map((o) => '- ' + tidySentence(o.s));
+
+  // Only add section headers when both sections carry weight; otherwise stay flat
+  // so short transcripts read as a simple list. Headers are themselves bullets so
+  // every emitted line remains a valid Markdown list item.
+  if (keyLines.length && actionLines.length) {
+    return ['- **Key points**', ...keyLines, '- **Action items**', ...actionLines].join('\n');
+  }
+  return (keyLines.length ? keyLines : actionLines).join('\n');
 }
 
 // Dual export: attach to the browser global scope, and expose for CommonJS
@@ -310,6 +394,7 @@ if (typeof module !== 'undefined' && module.exports) {
     collapseDisfluency,
     cleanForSummary,
     splitRunOns,
+    isActionItem,
     summarizeToBullets,
   };
 }

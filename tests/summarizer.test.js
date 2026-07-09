@@ -224,4 +224,38 @@ describe('summarizeToBullets', () => {
     expect(out).toContain('Sarah will own the migration');
     expect(out).not.toMatch(/walk you through/i);
   });
+
+  test('groups follow-up commitments under an Action items heading', () => {
+    const transcript = [
+      'The database migration is the single biggest blocker for the whole launch.',
+      'Revenue grew by fifteen percent across the enterprise customer segment.',
+      'The new onboarding flow tested much better with the pilot group last week.',
+      'I will chase the vendor and find out when the driver fix actually lands.',
+      'Let me double check whether the consent suppression change has shipped yet.',
+      'I need to pull the usage numbers for the cloud touch interface this week.',
+    ].join(' ');
+
+    const out = summarizeToBullets(transcript);
+    expect(out).toContain('- **Key points**');
+    expect(out).toContain('- **Action items**');
+    // The action heading must precede the commitment bullets it introduces.
+    expect(out.indexOf('**Action items**')).toBeLessThan(out.indexOf('I will chase the vendor'));
+    // Every emitted line is still a valid Markdown bullet.
+    out.split('\n').forEach((line) => expect(line.startsWith('- ')).toBe(true));
+  });
+
+  test('down-weights off-topic small talk below meeting substance', () => {
+    const transcript = [
+      'The weather has been amazing this week and I went surfing every morning.',
+      'The water was crystal clear and I saw a whole pot full of crabs out there.',
+      'It is so warm now, honestly the summer here keeps getting hotter every year.',
+      'The headline decision is that we will ship the new compiler in Q3 as planned.',
+      'The database migration is the single biggest blocker holding up the release.',
+      'Revenue grew by fifteen percent across the enterprise customer segment though.',
+    ].join(' ');
+
+    const out = summarizeToBullets(transcript);
+    expect(out).not.toMatch(/surfing|crabs|weather/i);
+    expect(out).toContain('ship the new compiler');
+  });
 });
