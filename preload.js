@@ -25,10 +25,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   transcriptionAvailable: () => ipcRenderer.invoke('transcription-available'),
   transcribeAudio: (pcm) => ipcRenderer.invoke('transcribe-audio', pcm),
 
-  // Transcription settings: read config + installed models, and save changes
-  transcriptionInfo: () => ipcRenderer.invoke('transcription-info'),
-  saveTranscriptionSettings: (settings) => ipcRenderer.invoke('save-transcription-settings', settings),
-
   // Transcript file: start/append/read the on-disk transcript during recording
   transcriptStart: (noteId) => ipcRenderer.invoke('transcript-start', noteId),
   transcriptAppend: (text) => ipcRenderer.invoke('transcript-append', text),

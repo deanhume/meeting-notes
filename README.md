@@ -53,9 +53,8 @@ npm start
 > The Whisper model (`models/ggml-small.en.bin`, ~466 MB) powers offline voice
 > transcription. It is not committed to git; `npm run fetch-model` downloads it, and
 > the build bundles it into the installer so **end users never download anything**.
-> The Record button is hidden until the model is present. Because it's the accurate
-> (heavier) "small" model, **Settings ▸ Voice Transcription** lets you toggle GPU
-> acceleration and tune CPU thread count so it keeps up on slower machines.
+> The Record button is hidden until the model is present. GPU acceleration is used
+> automatically when available (falling back to CPU otherwise).
 
 ## Documentation
 

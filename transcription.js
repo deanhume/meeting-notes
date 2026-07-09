@@ -135,21 +135,6 @@ async function getWhisper(app, gpu) {
   }
 }
 
-// Snapshot of transcription config for the settings UI.
-function transcriptionInfo(app, settings) {
-  const t = (settings && settings.transcription) || {};
-  const threads = Number.isInteger(Number(t.threads)) && Number(t.threads) >= 1 ? Number(t.threads) : 0;
-  return {
-    cores: LOGICAL_CORES,
-    gpu: t.gpu !== false,
-    threads, // 0 means "auto"
-    defaultThreads: DEFAULT_THREADS,
-    model: MODEL_FILENAME,
-    modelSize: MODEL_SIZE,
-    installed: isModelAvailable(app),
-  };
-}
-
 // ── Transcript cleanup patterns ───────────────────────────────
 
 // Hesitation / filler words Whisper transcribes verbatim.
@@ -337,7 +322,6 @@ module.exports = {
   computeThreads,
   resolveModelPath,
   isModelAvailable,
-  transcriptionInfo,
   resetWhisper,
   transcribePcm,
   cleanTranscript,

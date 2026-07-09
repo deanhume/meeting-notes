@@ -211,36 +211,10 @@ ipcMain.handle('transcription-available', () => {
   return transcription.isModelAvailable(app);
 });
 
-// Transcribe 16kHz mono PCM audio to text using on-device Whisper, honouring the
-// user's model / GPU / thread settings.
+// Transcribe 16kHz mono PCM audio to text using on-device Whisper. GPU
+// acceleration is enabled by default (falls back to CPU if unavailable).
 ipcMain.handle('transcribe-audio', async (_event, pcm) => {
   return transcription.transcribePcm(pcm, app, loadSettings());
-});
-
-// Report the transcription configuration + installed models for the settings UI.
-ipcMain.handle('transcription-info', () => {
-  return transcription.transcriptionInfo(app, loadSettings());
-});
-
-// Persist transcription settings (GPU / threads) and drop the resident model so
-// the next transcription reloads with the new configuration.
-ipcMain.handle('save-transcription-settings', async (_event, incoming) => {
-  const settings = loadSettings();
-  const t = settings.transcription || {};
-  if (incoming && typeof incoming === 'object') {
-    if (typeof incoming.gpu === 'boolean') {
-      t.gpu = incoming.gpu;
-    }
-    if (incoming.threads === 0 || incoming.threads === null || incoming.threads === undefined) {
-      t.threads = 0;
-    } else if (Number.isInteger(incoming.threads) && incoming.threads >= 1) {
-      t.threads = incoming.threads;
-    }
-  }
-  settings.transcription = t;
-  saveSettings(settings);
-  await transcription.resetWhisper();
-  return transcription.transcriptionInfo(app, settings);
 });
 
 // Return the current auto-update status to the renderer (polled from settings modal)

@@ -25,11 +25,9 @@
    This downloads `models/ggml-small.en.bin` (~466 MB). It is not committed to git,
    but the build bundles it into the installer so end users never download anything.
    The Record button in the note editor stays hidden until the model is present.
-
-   The "small" model is accurate but CPU-heavy. **Settings ▸ Voice Transcription**
-   exposes two knobs for slower machines: a GPU-acceleration toggle (on by default,
-   falls back to CPU automatically if unavailable) and a CPU thread override
-   (0 = auto, ~75% of logical cores).
+   GPU acceleration is enabled by default and falls back to CPU automatically if
+   unavailable; thread count is auto-tuned (~75% of logical cores). Transcription is
+   fully automatic — there are no user-facing transcription settings.
 
 ## Running in Development Mode
 
