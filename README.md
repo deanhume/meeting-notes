@@ -72,20 +72,6 @@ npm start
 
 Electron.js · Express.js · Vanilla JS · JSON storage · electron-updater
 
-## Version History
-
-### 1.2.0 (2026-06-23)
-- Voice recording with offline speech-to-text — record mic and/or system audio and transcribe directly into notes
-
-### 1.1.7 (2026-06-09)
-- Markdown support with live preview and formatting toolbar
-
-### 1.1.0 (2026-05-20)
-- Autosave functionality
-
-### 1.0.0 (2026-05-19)
-- Initial release
-
 ## License
 
 MIT — Dean Hume
