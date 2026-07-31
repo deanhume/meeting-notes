@@ -83,3 +83,16 @@ See `docs/` for deeper guides: `DEVELOPMENT.md`, `BUILDING.md`, `USAGE.md`, `AUT
   - **Heavy requirements.** Chrome 138+, ~22 GB free disk, and either >4 GB VRAM GPU or 16 GB RAM + 4 cores — versus the current zero-dependency summariser that runs everywhere.
   - **API shape mismatch.** It's fully **async** (`Summarizer.create()` / `.summarize()` return promises) and needs **user activation** for the first model download, which clashes with the synchronous `summarizeToBullets` and the 30s live-summary auto-refresh loop. Non-deterministic output would also break the assertions in `tests/summarizer.test.js`.
   - Same reasoning as the Windows AI path above: too little hardware reach and too much added complexity for the app's needs. *(User decision, 2026-07-09.)*
+
+- **FLAN-T5-small/base via Transformers.js.** Prototyped with local ONNX inference and deliberately **rejected** — do **not** suggest or re-implement either model unless the maintainer explicitly asks. Findings from the 2026-07-30 spikes:
+  - **FLAN-T5-small Q4 hallucinated facts** even on a five-sentence synthetic meeting, inventing company/media details that were absent from the transcript.
+  - **Higher precision did not solve coverage.** FLAN-T5-small Q8 and FLAN-T5-base Q8 usually returned only one action while omitting other named owners, decisions, deadlines, and numerical facts. Tighter extraction prompts and beam search did not materially improve this.
+  - **Poor fit for long meetings.** The practical ~512-token input limit requires hierarchical chunking, which loses cross-chunk context and compounds omissions. Base Q8 also adds roughly 275 MB of model assets.
+  - The trial code and model assets were removed after real WebGPU inference demonstrated that enabling FLAN-T5 would make summaries less complete and trustworthy than the existing extractive summariser.
+
+- **OpenELM-270M-Instruct via Transformers.js.** Tested extensively against the real 4,675-word transcript `transcription_0747cff734d8.txt` and deliberately **rejected** — do **not** suggest or re-implement it unless the maintainer explicitly asks. Findings from the 2026-07-30 spikes:
+  - **Quantized runtime problems.** The Q4F16 ONNX export loaded on WebGPU but immediately emitted EOS/empty output for every prompt. Q8 generated text but required roughly 305 MB of weights.
+  - **Prompting did not fix quality.** The exact prompt `"Summarize the following text into exactly three bullet points. Text: [transcription]"` produced only: `"Maybe."`, `"Maybe it'd be better for us."`, and `"Well, it would be better if we went there."`
+  - **Map-reduce did not help.** Eight bounded map chunks produced repetitive continuations, invented organisational details, prompt fragments, and unrelated website-disclaimer text. The normal reduce stage returned an empty string; forcing output hallucinated a Christian Science website comment disclaimer.
+  - **Raw prompting was actively unsafe for factual notes.** Simple synthetic meeting prompts hallucinated unrelated geopolitical and import-tax stories. The model's 2,048-token context and weak instruction following make it unsuitable for trustworthy meeting summarisation.
+  - All OpenELM spike code, temporary servers, browser artifacts, and model assets were removed; none of it belongs in the application.
