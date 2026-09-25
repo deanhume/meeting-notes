@@ -5,6 +5,13 @@
 # Meeting Notes
 A lightweight, local-first desktop app for keeping organised meeting notes with the people you work with. Track every 1:1 and team conversation by person, write in Markdown with live preview, tag and filter notes by topic, and even record meetings to transcribe and summarise them into bullet points — all on-device. Your data never leaves your machine: no cloud, no accounts, and it works completely offline. Built with Electron.js and Express.
 
+Recording summaries distinguish discussion highlights, decisions, actions,
+proposals and open questions, with optional supporting transcript passages saved
+alongside the notes. Related passages are grouped by topic and selected within a
+shared word budget; brief summaries retain recognised commitments rather than
+capping action items. No additional summarisation model is required; review
+the quoted evidence because extraction and transcription can still be wrong.
+
 ## Features
 
 - 📝 Track meeting notes for multiple people

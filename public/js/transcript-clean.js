@@ -23,10 +23,10 @@
 
 // Hesitation / filler words Whisper transcribes verbatim.
 // Matched whole-word, case-insensitive. The "m{2,}" avoids stripping the "m" in "I'm".
-const FILLER_PATTERN = /\b(?:u+m+|u+h+|e+r+m?|a+h+|e+h+|h+m+|m+h+m+|m{2,}|uh[\s-]?huh)\b[,]?/gi;
+const FILLER_PATTERN = /\b(?:u+m+|u+h+(?![\s-]?huh\b)|e+r+m?|a+h+|e+h+|h+m+|m+h+m+|m{2,})\b[,]?/gi;
 
 // Non-speech annotations Whisper emits (e.g. "[BLANK_AUDIO]", "(background noise)", "♪ music ♪")
-const NON_SPEECH_PATTERN = /[\[(*][^\])*]*[\])*]|[♪♫]+/g;
+const NON_SPEECH_PATTERN = /[\[(*]\s*(?:blank_audio|background noise|music|applause|silence|inaudible|laughter|laughing|crosstalk|no speech)\s*[\])*]|[♪♫]+/gi;
 
 // ── Cleanup functions (each handles one type of noise) ────────
 
@@ -81,9 +81,9 @@ function toSentenceLines(text) {
 // high-confidence continuation cues) so it never fabricates run-on sentences.
 
 // A line made up solely of these acknowledgement words carries no meeting content.
-const BACKCHANNEL_WORDS = new Set(('yeah yes yep yup no nope nah ok okay k right exactly sure cool nice '
+const BACKCHANNEL_WORDS = new Set(('yeah yes yep yup ok okay k right exactly sure cool nice '
   + 'great good fine thanks thank you bye goodbye cheers absolutely alright wow oh oops hmm mhm mmhm '
-  + 'huh haha lol well so um uh er erm ah eh definitely totally agreed correct indeed maybe perhaps '
+  + 'huh haha lol well so um uh er erm ah eh definitely totally correct indeed '
   + 'hello hi hey mate man guys please welcome').split(/\s+/));
 
 // A connective/pronoun a chunk tends to end on when one sentence was split across
@@ -92,7 +92,9 @@ const CONTINUATION_WORD = new Set(('and but so or to with of in on for that beca
   + 'were will would can cant cannot could should i we you he she they my our your this these those '
   + 'if when then at as by from into over after before about').split(/\s+/));
 
-function isBackchannelLine(line) {
+function isBackchannelLine(line, previous = '') {
+  if (/[?]\s*$/.test(previous) || /\b(?:propose|suggest|should|could|shall we)\b/i.test(previous)) return false;
+  if (/\d/.test(line)) return false;
   const words = line.toLowerCase().match(/[a-z']+/g) || [];
   if (words.length === 0) return true;
   return words.every((w) => BACKCHANNEL_WORDS.has(w));
@@ -104,7 +106,7 @@ function stripTerminalPunct(s) {
 }
 
 function lastWordOf(s) {
-  const m = s.toLowerCase().match(/[a-z']+/g);
+  const m = s.toLowerCase().match(/[a-z0-9']+/g);
   return m ? m[m.length - 1].replace(/'/g, '') : '';
 }
 
@@ -118,11 +120,11 @@ function isIncompleteFragment(prev) {
 
 function finalizeTranscript(text) {
   if (!text) return '';
-  const lines = text
+  const source = text
     .split(/\r?\n/)
     .map((l) => l.trim())
-    .filter(Boolean)
-    .filter((l) => !isBackchannelLine(l));
+    .filter(Boolean);
+  const lines = source.filter((l, i) => !isBackchannelLine(l, source[i - 1] || ''));
 
   const merged = [];
   let run = 0; // consecutive merges onto the current tail — capped so we never
@@ -166,7 +168,13 @@ if (typeof module !== 'undefined' && module.exports) {
     collapseRepeats,
     normalizeWhitespace,
     toSentenceLines,
+    isBackchannelLine,
+    isIncompleteFragment,
     cleanTranscript,
     finalizeTranscript,
   };
+}
+
+if (typeof window !== 'undefined') {
+  window.transcriptCleanup = { isBackchannelLine, isIncompleteFragment };
 }

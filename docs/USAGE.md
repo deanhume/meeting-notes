@@ -25,6 +25,57 @@ Toggle between light and dark themes using the theme toggle button at the bottom
 - `Ctrl + B` - Bold (in note editor)
 - `Ctrl + I` - Italic (in note editor)
 
+## Recording Summaries
+
+In the desktop app, stopping a recording produces an on-device, extractive
+summary. It separates discussion highlights, decisions, actions, tentative
+proposals and open questions. It preserves quoted wording rather than generating
+a rewritten account of the meeting.
+
+- **Full highlights** selects up to 16 optional passages within a shared
+  500-word target. Related points are grouped under phrases found in the
+  transcript, rather than giving every small fragment its own topic.
+  Explicit `Topic: Migration` or `Agenda item: Hiring` headings are honoured.
+- **Brief highlights** uses up to seven optional passages and a 220-word target.
+  Both modes retain recognised actions, decisions and dated visit arrangements;
+  these can exceed the target. Proposals and open questions compete with other
+  highlights for space. Neither mode guarantees that every real commitment was
+  recognised. Headings and supporting passages are outside the word target.
+- **Include supporting transcript passages** adds source references such as
+  `[S12]` and the original passages to the note. These are saved as ordinary
+  Markdown, so they remain available when the note is reopened or exported.
+- **Regenerate summary** applies changed options to the most recent transcript
+  in the current editor session. An untouched generated block is replaced;
+  if you edited that block, a fresh one is appended without overwriting your work.
+  Closing or switching notes clears this temporary regeneration cache.
+
+Source IDs are assigned before filtering and remain stable when complete
+segments are appended to the same transcript. IDs are local to that transcript,
+not global identifiers. Original stored transcript files are not rewritten.
+Choosing a shorter summary does not truncate the transcript.
+
+Review names, dates, negations and correction exchanges before relying on the
+notes. Owner and due-date fields are extracted only when explicitly recognised;
+**not specified** means the extractor could not safely populate the field, not
+necessarily that nobody said it. An unlabelled "I'll" is not assigned to a person.
+Explicit corrections retain both statements for review rather than inventing a
+new final sentence. Personal context is no longer discarded simply because it
+mentions holidays, summer, coffee or similar words.
+
+The summariser reconnects some speech-to-text fragments and removes limited
+verbal repetition, while retaining original passages as evidence. It cannot
+reliably repair misheard names, resolve ambiguous dates or supply a missing
+subject. Visit arrangements remain quoted; a recorded `1030`, for example, is
+not silently converted to `10:30am`. Inferred topic labels are navigational hints,
+not verified attribution of every nearby remark.
+
+If a generated note exceeds the existing 50,000-character limit, the app keeps
+your existing note and transcript and reports the problem. Choose brief
+highlights or omit supporting passages, then regenerate; unusually large action
+lists may still need manual editing. Older saved notes are not automatically
+rewritten. Recording still requires the bundled speech-to-text model; these
+summary improvements require no additional model, dependency or download.
+
 ## Troubleshooting
 
 ### App won't start

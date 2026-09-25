@@ -64,6 +64,15 @@ describe('cleanTranscript', () => {
     const out = cleanTranscript('We shipped the API and the UI.');
     expect(out).toBe('We shipped the API and the UI.');
   });
+
+  test('keeps substantive bracketed text and parenthesised corrections', () => {
+    expect(cleanTranscript('Ship Monday (not Friday). [Sarah] owns the migration.'))
+      .toBe('Ship Monday (not Friday).\n[Sarah] owns the migration.');
+  });
+
+  test('preserves a spoken affirmative rather than treating it as hesitation', () => {
+    expect(cleanTranscript('Uh-huh.')).toBe('Uh-huh.');
+  });
 });
 
 describe('finalizeTranscript', () => {
@@ -125,6 +134,20 @@ describe('finalizeTranscript', () => {
     expect(lines.length).toBe(2);
     expect(lines[0]).toBe('We are going to And then we will.');
     expect(lines[1]).toBe('Ship the product tomorrow.');
+  });
+
+  test('retains negative replies, explicit agreements and numeric answers', () => {
+    expect(finalizeTranscript('Can we launch Friday?\nNo.\nShip on Monday instead.\nAgreed.\nHow many licences?\n15.'))
+      .toBe('Can we launch Friday?\nNo.\nShip on Monday instead.\nAgreed.\nHow many licences?\n15.');
+  });
+
+  test('retains a positive reply to a question', () => {
+    expect(finalizeTranscript('Should we proceed?\nYes.')).toBe('Should we proceed?\nYes.');
+  });
+
+  test('does not mistake a completed numeric amount for a trailing connective', () => {
+    expect(finalizeTranscript('We agreed to cap the budget at $1200.\nPriya will send the request.'))
+      .toBe('We agreed to cap the budget at $1200.\nPriya will send the request.');
   });
 });
 

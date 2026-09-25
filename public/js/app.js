@@ -740,6 +740,7 @@ function resetAutosave() {
 
 function openNewNote() {
   editingNoteId = null;
+  resetRecordingSummary();
   currentTags = [];
   resetAutosave();
   switchNoteTab('write');
@@ -757,6 +758,7 @@ function openEditNote(noteId) {
   const note = currentNotes.find(n => n.id === noteId);
   if (!note) return;
   editingNoteId = noteId;
+  resetRecordingSummary();
   currentTags = [...(note.tags || [])];
   resetAutosave();
   switchNoteTab('write');
@@ -772,7 +774,7 @@ function openEditNote(noteId) {
 async function saveOnModalClose() {
   // If a recording is still running, stop it and wait for the transcript to be
   // summarised into the note first — otherwise the in-progress summary is lost.
-  await finalizeRecordingIfActive();
+  if (!await finalizeRecordingIfActive()) return;
 
   const content = document.getElementById('noteContentInput').value.trim();
   if (!content) {
@@ -793,13 +795,14 @@ async function saveOnModalClose() {
 
 function closeNoteModal() {
   resetAutosave();
+  resetRecordingSummary();
   document.getElementById('noteModal').classList.add('hidden');
 }
 
 async function saveNoteModal() {
   // A recording may still be capturing when the user hits Ctrl/Cmd+Enter; finalise
   // it so the summary lands in the note before we read the content below.
-  await finalizeRecordingIfActive();
+  if (!await finalizeRecordingIfActive()) return;
 
   const title = document.getElementById('noteTitleInput').value.trim();
   const content = document.getElementById('noteContentInput').value.trim();
@@ -1120,6 +1123,7 @@ function wireEvents() {
   document.getElementById('noteModalClose').addEventListener('click', saveOnModalClose);
   document.getElementById('noteModalCancel').addEventListener('click', saveOnModalClose);
   document.getElementById('noteModalSave').addEventListener('click', saveNoteModal);
+  document.getElementById('regenerateSummary').addEventListener('click', regenerateRecordingSummary);
   // The note modal is intentionally NOT dismissed by clicking the backdrop: a
   // recording/transcription may be in progress, so it must be closed via an
   // explicit action (the ✕ button, Cancel, Save, or Escape).
@@ -1307,6 +1311,8 @@ let processedSamples = 0;      // 16kHz-sample cursor: audio already transcribed
 let liveBusy = false;          // Guards against overlapping chunk transcriptions
 let liveOpPromise = null;      // Resolves when the in-flight chunk finishes
 let liveSummaryText = '';       // The summary block currently in the note textarea
+let lastSummaryTranscript = '';
+let recordingFinalizationFailed = false;
 let recordingStopWaiters = []; // Promises resolved when handleRecordingStop finishes
 
 // ── Recording constants ──
@@ -1406,6 +1412,8 @@ async function startRecording() {
   // during this window (the button already reads "Stop" but mediaRecorder isn't
   // live yet, so toggleRecording would otherwise start a duplicate capture).
   isStarting = true;
+  recordingFinalizationFailed = false;
+  document.getElementById('regenerateSummary').disabled = true;
   const btn = document.getElementById('recordBtn');
   btn.classList.add('recording');
   document.getElementById('recordBtnLabel').textContent = 'Stop';
@@ -1424,6 +1432,7 @@ async function startRecording() {
     document.getElementById('recordBtnLabel').textContent = 'Record';
     setRecordStatus(`Audio capture unavailable: ${e.name || ''} ${e.message || e}`.trim());
     isStarting = false;
+    document.getElementById('regenerateSummary').disabled = !lastSummaryTranscript;
     return;
   }
 
@@ -1494,10 +1503,13 @@ async function finalizeRecordingIfActive() {
     const done = new Promise((resolve) => recordingStopWaiters.push(resolve));
     stopRecording(); // fires onstop → handleRecordingStop (async)
     await done;
+    return !recordingFinalizationFailed;
   } else if (isTranscribing) {
     // Stop was already pressed and the final pass is running — wait for it.
     await new Promise((resolve) => recordingStopWaiters.push(resolve));
+    return !recordingFinalizationFailed;
   }
+  return true;
 }
 
 function cleanupRecordStream() {
@@ -1524,7 +1536,12 @@ async function handleRecordingStop() {
   document.getElementById('recordBtnLabel').textContent = 'Record';
   cleanupRecordStream(); // also stops the live-chunk interval
 
-  if (!recordedChunks.length) { setRecordStatus(''); resolveStopWaiters(); return; }
+  if (!recordedChunks.length) {
+    setRecordStatus('');
+    document.getElementById('regenerateSummary').disabled = !lastSummaryTranscript;
+    resolveStopWaiters();
+    return;
+  }
 
   isTranscribing = true;
   btn.classList.add('transcribing');
@@ -1541,12 +1558,15 @@ async function handleRecordingStop() {
     const hadText = await refreshSummaryFromFile();
     setRecordStatus(hadText ? 'Summarised' : 'No speech detected');
   } catch (e) {
+    recordingFinalizationFailed = true;
     console.error('Transcription failed:', e);
     setRecordStatus('Transcription failed');
+    showError(`Could not finish recording: ${e.message}`);
   } finally {
     isTranscribing = false;
     btn.classList.remove('transcribing');
     btn.disabled = false;
+    document.getElementById('regenerateSummary').disabled = !lastSummaryTranscript;
     resolveStopWaiters(); // unblock any pending modal-close finalisation
     setTimeout(() => {
       const recording = mediaRecorder && mediaRecorder.state === 'recording';
@@ -1639,19 +1659,35 @@ async function blobToPcm16kMono(blob) {
 
 // Read the transcript file written during recording, summarise it, and update the
 // note's summary block. Returns true if the file contained any transcribed text.
-// Called on a 30s timer for a real-time feel, and once more on Stop for a final pass.
+// Called at Stop. Source references must be assigned before transcript filtering.
 async function refreshSummaryFromFile() {
   let transcript = '';
   try {
-    transcript = (await window.electronAPI.transcriptRead()) || '';
+    transcript = (await window.electronAPI.transcriptRead({ raw: true })) || '';
   } catch (e) {
     console.error('Reading transcript file failed:', e);
-    return false;
+    throw e;
   }
   transcript = transcript.trim();
   if (!transcript) return false;
-  updateLiveSummary(transcript);
-  return true;
+  return updateLiveSummary(transcript);
+}
+
+function resetRecordingSummary() {
+  liveSummaryText = '';
+  lastSummaryTranscript = '';
+  document.getElementById('regenerateSummary').disabled = true;
+}
+
+function regenerateRecordingSummary() {
+  if (!lastSummaryTranscript || isStarting || isTranscribing ||
+      mediaRecorder?.state === 'recording') return;
+  try {
+    updateLiveSummary(lastSummaryTranscript);
+  } catch (e) {
+    console.error('Summary generation failed:', e);
+    showError(e.message);
+  }
 }
 
 // Summarise the given transcript and write it into the note, keeping that same
@@ -1660,23 +1696,34 @@ async function refreshSummaryFromFile() {
 // up duplicates. If the user has edited/removed the block, we append a fresh one.
 function updateLiveSummary(transcript) {
   const text = (transcript || '').trim();
-  if (!text) return;
-  const summary = summarizeToBullets(text);
-  if (!summary) return;
+  if (!text) return false;
+  lastSummaryTranscript = text;
+  document.getElementById('regenerateSummary').disabled = false;
+  const summary = summarizeToBullets(text, {
+    brief: document.getElementById('summaryDetail').value === 'brief',
+    includeEvidence: document.getElementById('summaryEvidence').checked
+  });
+  if (!summary) return false;
   const block = `--- 📝 Meeting Summary 📝 ---\n${summary}`;
 
   const textarea = document.getElementById('noteContentInput');
+  let nextContent;
   if (liveSummaryText && textarea.value.includes(liveSummaryText)) {
-    textarea.value = textarea.value.replace(liveSummaryText, block);
+    nextContent = textarea.value.replace(liveSummaryText, () => block);
   } else {
     const existing = textarea.value;
     const needsNewline = existing.length > 0 && !existing.endsWith('\n');
     const prefix = existing.length === 0 ? '' : (needsNewline ? '\n\n' : '');
-    textarea.value = existing + prefix + block;
+    nextContent = existing + prefix + block;
   }
+  if (nextContent.length > 50000) {
+    throw new Error('Generated notes exceed the 50,000-character note limit. Choose brief highlights or turn off supporting passages, then select Regenerate summary. The transcript and your existing notes have been kept.');
+  }
+  textarea.value = nextContent;
   liveSummaryText = block;
   textarea.dispatchEvent(new Event('input'));
   if (editingNoteId) autosaveNote();
+  return true;
 }
 
 /* ── Init ─────────────────────────────────────────────────── */

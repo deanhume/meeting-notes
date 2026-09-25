@@ -28,5 +28,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Transcript file: start/append/read the on-disk transcript during recording
   transcriptStart: (noteId) => ipcRenderer.invoke('transcript-start', noteId),
   transcriptAppend: (text) => ipcRenderer.invoke('transcript-append', text),
-  transcriptRead: () => ipcRenderer.invoke('transcript-read')
+  transcriptRead: (options) => ipcRenderer.invoke('transcript-read', options)
 });

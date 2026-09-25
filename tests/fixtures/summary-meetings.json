@@ -1,0 +1,122 @@
+[
+  {
+    "id": "launch-reply",
+    "split": "development",
+    "transcript": "Can we launch on Friday?\nNo.\nWe need another security review.\nPriya will send the review checklist by Thursday.",
+    "facts": [
+      { "id": "rejection", "kind": "discussion", "phrases": ["Can we launch on Friday? No."] },
+      { "id": "checklist", "kind": "action", "phrases": ["Priya will send the review checklist by Thursday"], "owner": "Priya", "due": "Thursday" }
+    ]
+  },
+  {
+    "id": "corrected-decision",
+    "split": "development",
+    "transcript": "We agreed to ship the release on Friday.\nCorrection, we agreed to ship the release on Monday instead.\nSarah will send the revised schedule by Thursday.",
+    "facts": [
+      { "id": "latest-date", "kind": "decision", "status": "confirmed", "phrases": ["Correction, we agreed to ship the release on Monday instead"] },
+      { "id": "notify", "kind": "action", "phrases": ["Sarah will send the revised schedule by Thursday"], "owner": "Sarah", "due": "Thursday" }
+    ]
+  },
+  {
+    "id": "short-commitments",
+    "split": "development",
+    "transcript": "Ship it.\nMonday instead.\nSarah owns it.\nThe database migration is progressing according to plan.\nCustomer support reported fewer login failures after the patch.",
+    "facts": [
+      { "id": "move-date", "kind": "decision", "phrases": ["Ship it. Monday instead."] },
+      { "id": "owner", "kind": "action", "phrases": ["Sarah owns it"], "owner": "Sarah", "due": null }
+    ]
+  },
+  {
+    "id": "one-to-one",
+    "split": "development",
+    "transcript": "Topic: Workload\nAlex is concerned about burnout before the summer holiday.\nThe summer launch depends on completing the security review.\nTopic: Follow-up\nPriya will review the workload by Monday.",
+    "facts": [
+      { "id": "wellbeing", "kind": "discussion", "phrases": ["Alex is concerned about burnout before the summer holiday"] },
+      { "id": "review", "kind": "action", "phrases": ["Priya will review the workload by Monday"], "owner": "Priya", "due": "Monday" }
+    ]
+  },
+  {
+    "id": "proposals-not-decisions",
+    "split": "development",
+    "transcript": "Maybe we should move the launch to Monday.\nWe haven't decided on the budget.\nWho owns the security review?",
+    "facts": [
+      { "id": "proposal", "kind": "proposal", "status": "tentative", "phrases": ["Maybe we should move the launch to Monday"] },
+      { "id": "budget", "kind": "proposal", "status": "tentative", "phrases": ["We haven't decided on the budget"] },
+      { "id": "unassigned", "kind": "question", "phrases": ["Who owns the security review?"] }
+    ]
+  },
+  {
+    "id": "speaker-and-unknown-owner",
+    "split": "development",
+    "transcript": "Sarah: I'll check the migration by tomorrow.\nI'll chase the vendor.\nWe agreed not to ship without a security review.",
+    "facts": [
+      { "id": "named", "kind": "action", "phrases": ["Sarah: I'll check the migration by tomorrow"], "owner": "Sarah", "due": "tomorrow" },
+      { "id": "unknown", "kind": "action", "phrases": ["I'll chase the vendor"], "owner": null, "due": null },
+      { "id": "gate", "kind": "decision", "phrases": ["We agreed not to ship without a security review"] }
+    ]
+  },
+  {
+    "id": "numeric-answer",
+    "split": "development",
+    "transcript": "How many licences do we need?\n15.\nWe agreed to cap the budget at $1200.\nPriya will send the purchase request by 2026-10-02.",
+    "facts": [
+      { "id": "count", "kind": "discussion", "phrases": ["How many licences do we need? 15."] },
+      { "id": "cap", "kind": "decision", "phrases": ["cap the budget at $1200"] },
+      { "id": "purchase", "kind": "action", "phrases": ["Priya will send the purchase request by 2026-10-02"], "owner": "Priya", "due": "2026-10-02" }
+    ]
+  },
+  {
+    "id": "more-than-six-actions",
+    "split": "development",
+    "transcript": "Action item: review ticket 1.\nAction item: review ticket 2.\nAction item: review ticket 3.\nAction item: review ticket 4.\nAction item: review ticket 5.\nAction item: review ticket 6.\nAction item: review ticket 7.\nAction item: review ticket 8.",
+    "facts": [
+      { "id": "one", "kind": "action", "phrases": ["review ticket 1"], "owner": null, "due": null },
+      { "id": "two", "kind": "action", "phrases": ["review ticket 2"], "owner": null, "due": null },
+      { "id": "three", "kind": "action", "phrases": ["review ticket 3"], "owner": null, "due": null },
+      { "id": "four", "kind": "action", "phrases": ["review ticket 4"], "owner": null, "due": null },
+      { "id": "five", "kind": "action", "phrases": ["review ticket 5"], "owner": null, "due": null },
+      { "id": "six", "kind": "action", "phrases": ["review ticket 6"], "owner": null, "due": null },
+      { "id": "seven", "kind": "action", "phrases": ["review ticket 7"], "owner": null, "due": null },
+      { "id": "eight", "kind": "action", "phrases": ["review ticket 8"], "owner": null, "due": null }
+    ]
+  },
+  {
+    "id": "different-owners",
+    "split": "evaluation",
+    "transcript": "Dana will prepare the customer report by Tuesday.\nOmar will prepare the customer report by Thursday.\nThe customer asked for both regional reports.",
+    "facts": [
+      { "id": "dana", "kind": "action", "phrases": ["Dana will prepare the customer report by Tuesday"], "owner": "Dana", "due": "Tuesday" },
+      { "id": "omar", "kind": "action", "phrases": ["Omar will prepare the customer report by Thursday"], "owner": "Omar", "due": "Thursday" }
+    ]
+  },
+  {
+    "id": "budget-negation",
+    "split": "evaluation",
+    "transcript": "We agreed to approve $500 for the pilot.\nWe agreed not to approve $5000 for the expansion.\nWho will review the expansion proposal?",
+    "facts": [
+      { "id": "pilot", "kind": "decision", "phrases": ["We agreed to approve $500 for the pilot"] },
+      { "id": "expansion", "kind": "decision", "phrases": ["We agreed not to approve $5000 for the expansion"] },
+      { "id": "question", "kind": "question", "phrases": ["Who will review the expansion proposal?"] }
+    ]
+  },
+  {
+    "id": "agenda-coverage",
+    "split": "evaluation",
+    "transcript": "Topic: Infrastructure\nThe deployment is blocked by the expired certificate.\nTopic: Hiring\nThe hiring budget is frozen until the next quarter.\nTopic: Customer support\nThe summer support schedule depends on confirming holiday cover.\nTopic: Decisions\nWe decided to renew the certificate before deployment.",
+    "facts": [
+      { "id": "certificate", "kind": "discussion", "phrases": ["deployment is blocked by the expired certificate"] },
+      { "id": "hiring", "kind": "discussion", "phrases": ["hiring budget is frozen until the next quarter"] },
+      { "id": "cover", "kind": "discussion", "phrases": ["summer support schedule depends on confirming holiday cover"] },
+      { "id": "renew", "kind": "decision", "phrases": ["We decided to renew the certificate before deployment"] }
+    ]
+  },
+  {
+    "id": "answer-corrects-question",
+    "split": "evaluation",
+    "transcript": "Will Sarah send the invoice by Monday?\nPriya will send the invoice by Thursday.\nCan we close the account?\nNo, the payment is still outstanding.",
+    "facts": [
+      { "id": "invoice", "kind": "action", "phrases": ["Priya will send the invoice by Thursday"], "owner": "Priya", "due": "Thursday" },
+      { "id": "account", "kind": "discussion", "phrases": ["Can we close the account? No, the payment is still outstanding."] }
+    ]
+  }
+]

@@ -10,6 +10,8 @@
     "web": "node server.js",
     "fetch-model": "node scripts/fetch-model.js",
     "test": "jest",
+    "benchmark:summary": "node scripts/benchmark-summary.js",
+    "benchmark:brief": "node scripts/benchmark-brief.js",
     "bump": "npm version patch --no-git-tag-version",
     "build": "electron-builder --win --x64  ",
     "buildnobump": "electron-builder --win --x64  ",
