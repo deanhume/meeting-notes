@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = typeof globalThis.test === 'function' ? globalThis.test : require('node:test');
 const {
-  buildMeetingSummary, renderMeetingSummary, summarizeToBullets, displayIsExtractive, summaryWords
+  buildMeetingSummary, renderMeetingSummary, renderSummaryItem, summarizeToBullets, displayIsExtractive, summaryWords
 } = require('../public/js/summarizer');
 const { validateEvidence } = require('../scripts/local-summary-model');
 
@@ -42,7 +42,7 @@ test('associates an artifact with its completed download, not a future action', 
   const summary = checked('Thank you for that.\nThe Orion 4 build.\nI have it downloaded.');
   assert.equal(summary.items[0].displayText, 'The Orion 4 build: I have it downloaded.');
   assert.equal(summary.items[0].kind, 'discussion');
-  assert.match(renderMeetingSummary(summary), /Orion 4 build: I have it downloaded/);
+  assert.match(renderMeetingSummary(summary), /Orion 4 build: downloaded/);
 });
 
 test('preserves context for suggested purchases without inventing an owner', () => {
@@ -87,12 +87,12 @@ test('infers source phrases, merges plural variants and rejects conversational t
 
 test('uses a shared word and item budget rather than a quota for every fragment', () => {
   const summary = checked(longDiscussion());
-  assert.ok(summary.highlights.length <= 16);
+  assert.ok(summary.highlights.length <= 20);
   assert.ok(summary.briefHighlights.length <= 7);
-  for (const [brief, budget] of [[false, 500], [true, 220]]) {
+  for (const [brief, budget] of [[false, 360], [true, 220]]) {
     const ids = brief ? summary.briefHighlights : summary.highlights;
     const selected = summary.items.filter((item) => ids.includes(item.id));
-    assert.ok(selected.reduce((count, item) => count + summaryWords(item.displayText).length, 0) <= budget);
+    assert.ok(selected.reduce((count, item) => count + summaryWords(renderSummaryItem(item)).length, 0) <= budget);
     assert.ok(summaryWords(renderMeetingSummary(summary, { brief })).length <= budget + 20);
   }
   assert.ok(renderMeetingSummary(summary, { brief: true }).length < renderMeetingSummary(summary).length);

@@ -1,4 +1,4 @@
-const { createTranscriptSegments, displayIsExtractive } = require('../public/js/summarizer');
+const { createTranscriptSegments, displayIsExtractive, presentationIsGrounded } = require('../public/js/summarizer');
 
 const KINDS = ['discussion', 'decision', 'action', 'proposal', 'question'];
 const STATUSES = ['confirmed', 'tentative', 'unclear', 'superseded'];
@@ -50,6 +50,7 @@ function validateEvidence(summary) {
     // Duplicate evidence can support an already selected verbatim passage.
     if (!normalise(quoted).includes(normalise(item.text))) errors.push(`${label}: text is not a verbatim supported passage`);
     if (item.displayText !== undefined && !displayIsExtractive(item)) errors.push(`${label}: display changes source facts or introduces unsupported words`);
+    if (item.presentation !== undefined && !presentationIsGrounded(item)) errors.push(`${label}: presentation or context is not supported by its source`);
     for (const field of ['owner', 'due']) {
       if (item[field] && !quoted.includes(item[field])) errors.push(`${label}: ${field} does not occur in its evidence`);
     }

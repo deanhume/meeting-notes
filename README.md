@@ -7,8 +7,9 @@ A lightweight, local-first desktop app for keeping organised meeting notes with 
 
 Recording summaries distinguish discussion highlights, decisions, actions,
 proposals and open questions, with optional supporting transcript passages saved
-alongside the notes. Related passages are grouped by topic and selected within a
-shared word budget; brief summaries retain recognised commitments rather than
+alongside the notes. Related facts are grouped by topic and selected for coverage
+within a shared word budget, with contextual follow-ups and explicit ambiguity
+markers; brief summaries retain recognised commitments rather than
 capping action items. No additional summarisation model is required; review
 the quoted evidence because extraction and transcription can still be wrong.
 

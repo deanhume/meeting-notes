@@ -29,12 +29,13 @@ Toggle between light and dark themes using the theme toggle button at the bottom
 
 In the desktop app, stopping a recording produces an on-device, extractive
 summary. It separates discussion highlights, decisions, actions, tentative
-proposals and open questions. It preserves quoted wording rather than generating
-a rewritten account of the meeting.
+proposals and open questions. It uses selected source wording and a small set of
+guarded shortening templates, not a language model.
 
-- **Full highlights** selects up to 16 optional passages within a shared
-  500-word target. Related points are grouped under phrases found in the
-  transcript, rather than giving every small fragment its own topic.
+- **Full highlights** selects up to 20 optional facts within a shared
+  360-word target. Selection balances risks, status, constraints, alternatives
+  and follow-ups instead of repeatedly selecting a project's introduction.
+  Related points are grouped under phrases found in the transcript.
   Explicit `Topic: Migration` or `Agenda item: Hiring` headings are honoured.
 - **Brief highlights** uses up to seven optional passages and a 220-word target.
   Both modes retain recognised actions, decisions and dated visit arrangements;
@@ -62,12 +63,20 @@ Explicit corrections retain both statements for review rather than inventing a
 new final sentence. Personal context is no longer discarded simply because it
 mentions holidays, summer, coffee or similar words.
 
+Vague follow-ups get a nearby object or topic only when the source supports the
+connection. Otherwise **Object not specified** remains visible. A request to
+share findings is labelled **not confirmed**, not silently turned into a new
+commitment. Mentioning a contact does not assign that person an action.
+
 The summariser reconnects some speech-to-text fragments and removes limited
 verbal repetition, while retaining original passages as evidence. It cannot
 reliably repair misheard names, resolve ambiguous dates or supply a missing
-subject. Visit arrangements remain quoted; a recorded `1030`, for example, is
-not silently converted to `10:30am`. Inferred topic labels are navigational hints,
-not verified attribution of every nearby remark.
+subject. Incomplete names/plans are labelled for review. Visit arrangements use
+compact fields for the mentioned date, raw time, transport and corrections,
+with the original exchange retained in the supporting passages. A recorded
+`1030` is not silently converted to `10:30am`; conditional travel and conflicting
+dates remain flagged. Inferred topic labels are navigational hints, not verified
+attribution of every nearby remark.
 
 If a generated note exceeds the existing 50,000-character limit, the app keeps
 your existing note and transcript and reports the problem. Choose brief

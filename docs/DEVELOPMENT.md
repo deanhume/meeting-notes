@@ -142,7 +142,8 @@ The application stores data in JSON files:
 `buildMeetingSummary(transcript)` returns
 `{ version, segments, items, topics, highlights, briefHighlights }`.
 Each source segment has a stable ordinal ID (`S1`, `S2`, ...); every extracted
-item has a kind, status, original `text`, compacted `displayText`, topic, nullable owner/due date, evidence
+item has a kind, status, original `text`, compacted `displayText`, a `facet`,
+source-bound `presentation`, topic, nullable owner/due date, evidence
 quotes and an optional `supersedes` reference. IDs remain stable when complete
 segments are appended, not when the original text is edited.
 
@@ -160,12 +161,35 @@ Passage scoring considers distinct work signals, concrete follow-ups, completed
 work, concerns and proposals, rather than rewarding repeated keywords or giving
 every fragment a selection quota. Nearby explicit examples are down-weighted
 and are not classified as real commitments. Live demonstration checks are not
-treated as follow-ups. Full/brief selection shares a 500/220-word
-budget with at most 16/7 optional passages. Recognised actions, decisions and
+treated as follow-ups. The selector uses marginal coverage of topic/facet pairs
+and new content, not just independent sentence scores. Facets distinguish, for
+example, delivery risk, responsibility, status, capacity, allocation, alternatives
+and completed work. Repeated background gets diminishing value and, in longer
+meetings, at most two slots per topic unless there is an explicit correction.
+Full/brief selection shares a 360/220-word
+budget with at most 20/7 optional facts. Recognised actions, decisions and
 dated visit bundles are retained even when they exceed that budget. Optional
 proposals and questions are ranked alongside discussion. Headings and the
 evidence appendix are not part of the budget.
 Follow-up context and quoted visit bundles can contain additional source segments.
+The budget is measured against `renderSummaryItem`, including clarification and
+review labels, rather than the longer underlying evidence. Related resource
+facts can share a bullet without changing their wording.
+
+`presentation` is separate from the source-preserving `displayText`. A bounded
+set of templates can quote an independent contrast clause, shorten a completed
+artifact or a proposal, or present visit fields. Scope guards prevent lifting a
+clause out of a qualifier such as "I think", "only" or a condition. Source text and
+quotes remain available even when a presentation omits redundant wording.
+Incomplete contact/scope fragments are explicitly marked, not completed by code.
+
+Vague actions are not deduplicated before their objects are known. Clarification
+uses one unambiguous nearby artifact mention, or a quoted local topic phrase,
+without crossing explicit agenda boundaries or assigning a contact as an owner.
+An adjacent, narrowly recognised request for findings remains labelled
+"not confirmed". Conditional commitments are proposals rather than unconditional
+actions; an embedded question such as "I'll check if..." is not a condition.
+Identical status text in different explicit topics remains separate.
 
 Only adjacent, explicit corrections
 with matching subject words (or a short "instead" correction) can supersede a
@@ -173,9 +197,13 @@ record. Conflicting statements without that evidence remain separate for review.
 Tentative corrections remain proposals and do not cancel a confirmed commitment.
 `displayIsExtractive` checks source-token order plus preservation of important
 qualifiers, negation and numbers; benchmark validation applies it to display text
-as well as checking original evidence. This is not a proof of semantic equivalence.
-Visit bundles quote date/time/correction exchanges without guessing missing
-AM/PM, month, year or an unambiguous final date. Inferred headings are contextual
+as well as checking original evidence. `presentationIsGrounded` additionally checks
+context/request references and regenerates the permitted presentation from its
+source inputs to detect unsupported changes. Neither check proves semantic
+equivalence, correct context resolution or complete fact coverage.
+Visit fields retain raw times, exclude explicit prices, and flag multiple dates/times, conditions and
+corrections without guessing missing AM/PM, month, year or a final date.
+Inferred headings are contextual
 hints, not verified project attribution.
 This is heuristic extraction, not semantic understanding or speaker diarisation.
 
@@ -190,12 +218,14 @@ There are no new summarisation weights, runtime dependencies or downloads.
 The passage/selection regressions also run without Jest:
 
 ```powershell
-node --test tests\summary-passages.test.js
+node --test tests\summary-passages.test.js tests\summary-facts.test.js
 ```
 
 These invented cases cover broken speech boundaries, plural work signals,
 completed downloads, suggested purchases, transport jokes, word budgets and
-preservation of qualifiers. They contain no private meeting text.
+preservation of qualifiers. Fact tests also cover repeated introductions versus
+distinct constraints, ambiguous referents, contact/owner separation, conditional
+follow-ups and tampered presentations. They contain no private meeting text.
 
 ### Synthetic quality benchmark
 
