@@ -57,6 +57,11 @@ setInterval(() => {
 
 ## Publishing Updates
 
+The supported release path is the tag-driven GitHub Actions workflow documented
+in `RELEASE_CHECKLIST.md`. It builds on a clean Windows runner and publishes only
+after validating dependencies, transcription assets, packaged files and update
+metadata. The steps below are retained as a manual recovery procedure.
+
 ### Step 1: Build Your App
 
 ```bash

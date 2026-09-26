@@ -1,3 +1,4 @@
+const path = require('path');
 const { getTranscriptFileName, getTranscriptFilePath } = require('../transcript-file');
 
 describe('transcript file naming', () => {
@@ -12,6 +13,8 @@ describe('transcript file naming', () => {
   });
 
   test('builds path inside the transcriptions folder', () => {
-    expect(getTranscriptFilePath('/data', '1f68464a72dc')).toBe('/data/transcriptions/transcription_1f68464a72dc.txt');
+    expect(getTranscriptFilePath(path.parse(process.cwd()).root, '1f68464a72dc')).toBe(
+      path.join(path.parse(process.cwd()).root, 'transcriptions', 'transcription_1f68464a72dc.txt')
+    );
   });
 });

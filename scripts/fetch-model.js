@@ -111,7 +111,16 @@ async function main() {
   console.log('Transcription assets ready.');
 }
 
-main().catch((err) => {
-  console.error(`fetch-model failed: ${err.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(`fetch-model failed: ${err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  MODEL_FILES,
+  VENDOR_COPIES,
+  modelDir,
+  vendorDir,
+};

@@ -12,10 +12,12 @@
     "test": "jest",
     "benchmark:summary": "node scripts/benchmark-summary.js",
     "benchmark:brief": "node scripts/benchmark-brief.js",
+    "verify:release:pre": "node scripts/verify-release.js pre",
+    "verify:release:post": "node scripts/verify-release.js post",
     "bump": "npm version patch --no-git-tag-version",
-    "build": "electron-builder --win --x64  ",
-    "buildnobump": "electron-builder --win --x64  ",
-    "build:dir": "npm version patch --no-git-tag-version && electron-builder --win --x64 --dir"
+    "build": "npm run verify:release:pre && electron-builder --win --x64 && npm run verify:release:post",
+    "buildnobump": "npm run verify:release:pre && electron-builder --win --x64 && npm run verify:release:post",
+    "build:dir": "npm version patch --no-git-tag-version && npm run verify:release:pre && electron-builder --win --x64 --dir"
   },
   "build": {
     "appId": "com.deanhume.meetingnotes",

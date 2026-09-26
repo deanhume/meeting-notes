@@ -1,6 +1,26 @@
 # Quick Reference: Publishing Updates
 
-## Build and Publish Checklist
+## Automated Release
+
+Releases are built and published by `.github/workflows/release.yml` on a clean
+Windows GitHub Actions runner. Do not upload installers built from a developer
+workstation.
+
+1. Update the version in `package.json` and `package-lock.json`.
+2. Commit and push the release changes to `main`.
+3. Tag that exact commit with the same version, optionally prefixed with `v`:
+   ```bash
+   git tag 1.2.5
+   git push origin 1.2.5
+   ```
+4. Monitor the **Release** workflow. It installs dependencies, runs tests,
+   downloads the transcription assets, builds the installer, verifies the
+   packaged modules/model/checksums, uploads a draft, and then publishes it.
+
+If any step fails, no public release is created. A failed run that already
+created a draft can be rerun; its assets are replaced before publication.
+
+## Manual Build Reference
 
 ### 1. Build Your App
 ```bash
@@ -20,7 +40,7 @@ npm run build
 - `Meeting Notes-x.x.x-mac.zip` ← Upload to GitHub
 - `latest-mac.yml` ← **MUST UPLOAD** for auto-updates
 
-### 3. Create GitHub Release
+### 3. Create GitHub Release Manually
 
 1. Go to: https://github.com/deanhume/meeting-notes/releases/new
 2. Tag version: `v1.1.8` (must be higher than current)

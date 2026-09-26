@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]*.[0-9]*.[0-9]*'
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test -- --runInBand
+
+      - name: Prepare transcription assets
+        run: npm run fetch-model
+
+      - name: Build and verify Windows release
+        run: npm run build
+
+      - name: Retain verified release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: meeting-notes-${{ github.ref_name }}
+          path: |
+            dist/Meeting-Notes-Setup-*.exe
+            dist/Meeting-Notes-Setup-*.exe.blockmap
+            dist/latest.yml
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Create draft GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $assets = @(
+            "dist/Meeting-Notes-Setup-$version.exe",
+            "dist/Meeting-Notes-Setup-$version.exe.blockmap",
+            "dist/latest.yml"
+          )
+          gh release view $env:RELEASE_TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            $isDraft = gh release view $env:RELEASE_TAG --json isDraft --jq '.isDraft'
+            if ($isDraft -ne 'true') {
+              throw "Release $env:RELEASE_TAG already exists and is published."
+            }
+            gh release upload $env:RELEASE_TAG @assets --clobber
+          } else {
+            gh release create $env:RELEASE_TAG @assets `
+              --draft `
+              --verify-tag `
+              --title "v$version" `
+              --generate-notes
+          }
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit $env:RELEASE_TAG --draft=false
