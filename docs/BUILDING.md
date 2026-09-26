@@ -9,7 +9,8 @@ npm run build
 ```
 
 This will create:
-- `dist/Meeting Notes Setup x.x.x.exe` - NSIS installer
+- `dist/Meeting-Notes-Setup-x.x.x.exe` - NSIS installer
+- `dist/Meeting-Notes-Setup-x.x.x.exe.blockmap` - differential update metadata
 - `dist/latest.yml` - **Required for auto-updates** - upload this to GitHub Releases
 - `dist/win-unpacked/` - Unpacked application files
 

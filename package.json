@@ -1,6 +1,6 @@
 {
   "name": "meeting-notes",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Local meeting notes tracker",
   "main": "main.js",
   "author": "Dean Hume",
@@ -20,6 +20,7 @@
   "build": {
     "appId": "com.deanhume.meetingnotes",
     "productName": "Meeting Notes",
+    "artifactName": "Meeting-Notes-Setup-${version}.${ext}",
     "publish": [
       {
         "provider": "github",

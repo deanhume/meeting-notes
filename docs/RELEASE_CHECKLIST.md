@@ -11,7 +11,8 @@ npm run build
 ### 2. Files Created in `dist/` folder
 
 **Windows:**
-- `Meeting Notes Setup x.x.x.exe` ← Upload to GitHub
+- `Meeting-Notes-Setup-x.x.x.exe` ← Upload to GitHub
+- `Meeting-Notes-Setup-x.x.x.exe.blockmap` ← Upload to GitHub
 - `latest.yml` ← **MUST UPLOAD** for auto-updates
 
 **macOS:**
@@ -25,8 +26,12 @@ npm run build
 2. Tag version: `v1.1.8` (must be higher than current)
 3. Release title: `Version 1.1.8`
 4. Describe what's new
-5. Drag and drop ALL files from step 2
+5. Drag and drop ALL files from step 2 without renaming them
 6. Click "Publish release"
+
+Before publishing, open `latest.yml` and verify its `path` and `files[].url`
+exactly match the uploaded installer filename. A mismatch causes update checks
+to fail with HTTP 404.
 
 ### 4. Users Get Updated
 
@@ -45,6 +50,7 @@ npm run build
 ❌ **Auto-updates not working at all**
 - Only works in BUILT apps (not `npm start`)
 - Check logs: `%APPDATA%/meeting-notes/logs/main.log`
+- Confirm the installer filename exactly matches `latest.yml`
 
 ## Testing
 
