@@ -1,6 +1,8 @@
 [![Tests](https://github.com/deanhume/meeting-notes/actions/workflows/test.yml/badge.svg)](https://github.com/deanhume/meeting-notes/actions/workflows/test.yml)
 
-<img src="public/images/logo-256.png" alt="drawing" width="150"/>
+<video width="620" controls>
+  <source src="meeting-notes.mp4" type="video/mp4">
+</video>
 
 # Meeting Notes
 A lightweight, local-first desktop app for keeping organised meeting notes with the people you work with. Track every 1:1 and team conversation by person, write in Markdown with live preview, tag and filter notes by topic, and even record meetings to transcribe and summarise them into bullet points — all on-device. Your data never leaves your machine: no cloud, no accounts, and it works completely offline. Built with Electron.js and Express.
