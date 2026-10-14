@@ -144,3 +144,6 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+/brag-output
+.agents/skills/brag-slim/SKILL.md
+skills-lock.json
