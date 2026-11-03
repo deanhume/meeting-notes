@@ -1,6 +1,6 @@
 {
   "name": "meeting-notes",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "description": "Local meeting notes tracker",
   "main": "main.js",
   "author": "Dean Hume",
@@ -15,9 +15,9 @@
     "verify:release:pre": "node scripts/verify-release.js pre",
     "verify:release:post": "node scripts/verify-release.js post",
     "bump": "npm version patch --no-git-tag-version",
-    "build": "npm run verify:release:pre && electron-builder --win --x64 && npm run verify:release:post",
-    "buildnobump": "npm run verify:release:pre && electron-builder --win --x64 && npm run verify:release:post",
-    "build:dir": "npm version patch --no-git-tag-version && npm run verify:release:pre && electron-builder --win --x64 --dir"
+    "build": "npm run verify:release:pre && electron-builder --win --x64 --publish never && npm run verify:release:post",
+    "buildnobump": "npm run verify:release:pre && electron-builder --win --x64 --publish never && npm run verify:release:post",
+    "build:dir": "npm version patch --no-git-tag-version && npm run verify:release:pre && electron-builder --win --x64 --dir --publish never"
   },
   "build": {
     "appId": "com.deanhume.meetingnotes",
