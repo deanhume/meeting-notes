@@ -1318,7 +1318,8 @@ let recordingStopWaiters = []; // Promises resolved when handleRecordingStop fin
 // ── Recording constants ──
 const SAMPLE_RATE = 16000;     // Whisper expects 16kHz mono PCM
 const LIVE_CHUNK_MS = 5000;    // Attempt a transcription chunk every 5 seconds
-const LIVE_MIN_CHUNK_SAMPLES = SAMPLE_RATE * 2;    // Need at least 2s of new audio per chunk
+const LIVE_TARGET_CHUNK_SAMPLES = SAMPLE_RATE * 30;
+const LIVE_MIN_CHUNK_SAMPLES = SAMPLE_RATE * 20;
 const LIVE_EDGE_GUARD_SAMPLES = SAMPLE_RATE * 0.8; // Leave ~0.8s unprocessed to avoid cutting mid-word
 
 // Check if transcription is possible (Electron + on-device transcriber + browser audio APIs).
@@ -1589,9 +1590,10 @@ async function transcribeLiveChunk(force) {
       const pcm = await blobToPcm16kMono(blob);
       const edge = force ? pcm.length : Math.max(0, pcm.length - LIVE_EDGE_GUARD_SAMPLES);
       const available = edge - processedSamples;
-      if (available < (force ? 1 : LIVE_MIN_CHUNK_SAMPLES)) return;
+      if (available < (force ? 1 : LIVE_TARGET_CHUNK_SAMPLES)) return;
 
-      const cut = force ? edge : findQuietCut(pcm, processedSamples, edge);
+      const cut = force ? edge : findQuietCut(pcm, processedSamples,
+        Math.min(edge, processedSamples + LIVE_TARGET_CHUNK_SAMPLES));
       // Copy into a tightly-sized buffer so IPC doesn't ship the whole recording.
       const chunkPcm = new Float32Array(pcm.subarray(processedSamples, cut));
       if (!chunkPcm.length) return;
@@ -1619,10 +1621,10 @@ async function transcribeLiveChunk(force) {
 }
 
 // Pick a cut point near maxIdx that falls on the quietest moment (likely a pause
-// between words), minimising mid-word splits at chunk seams. Searches the last
-// ~2s before the edge for the lowest-energy 30ms window.
+// between words), minimising mid-word splits at chunk seams. Keep 20-30s of
+// context and search for the lowest-energy 30ms window in the final 10s.
 function findQuietCut(pcm, fromIdx, maxIdx) {
-  const searchStart = Math.max(fromIdx + SAMPLE_RATE, maxIdx - 2 * SAMPLE_RATE);
+  const searchStart = Math.max(fromIdx + LIVE_MIN_CHUNK_SAMPLES, maxIdx - 10 * SAMPLE_RATE);
   if (searchStart >= maxIdx) return maxIdx;
   const winLen = Math.floor(SAMPLE_RATE * 0.03);
   let bestIdx = maxIdx;

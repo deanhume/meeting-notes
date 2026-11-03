@@ -97,7 +97,8 @@ async function transcribe(pcm) {
   if (!pcm || pcm.length === 0) return '';
   const asr = await load();
   // whisper-small.en is English-only, so no language/task options are passed.
-  // Chunking mirrors the previous engine: 30s windows with 5s stride overlap.
+  // Live calls contain 20-30s of audio. Longer final tails use overlapping
+  // 30s windows; this overlap applies within a call, not between live calls.
   const out = await asr(pcm, {
     chunk_length_s: 30,
     stride_length_s: 5,

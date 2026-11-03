@@ -101,6 +101,69 @@ describe('recording summary integration', () => {
   });
 });
 
+describe('recording chunk boundaries', () => {
+  function recording(seconds) {
+    const { context } = renderer();
+    const pcm = new Float32Array(Math.round(seconds * 16000)).fill(0.25);
+    context.Blob = Blob;
+    context.blobToPcm16kMono = jest.fn(async () => pcm);
+    context.window.cleanTranscript = context.cleanTranscript;
+    context.window.rendererTranscription = { transcribe: jest.fn(async () => 'Keep the whole sentence.') };
+    context.window.electronAPI = { transcriptAppend: jest.fn(async () => {}) };
+    vm.runInContext('recordedChunks = [new Blob(["audio"])];', context);
+    return { context, pcm };
+  }
+
+  test('waits for 30 seconds of context plus the live-edge guard', async () => {
+    const { context } = recording(30.5);
+    await context.transcribeLiveChunk(false);
+    expect(context.window.rendererTranscription.transcribe).not.toHaveBeenCalled();
+    expect(vm.runInContext('processedSamples', context)).toBe(0);
+  });
+
+  test('selects a quiet boundary between 20 and 30 seconds, ignoring earlier pauses', async () => {
+    const { context, pcm } = recording(31);
+    pcm.fill(0, 10 * 16000, 11 * 16000);
+    pcm.fill(0.01, 25 * 16000, 26 * 16000);
+    await context.transcribeLiveChunk(false);
+    const chunk = context.window.rendererTranscription.transcribe.mock.calls[0][0];
+    expect(chunk.length).toBeGreaterThanOrEqual(25 * 16000);
+    expect(chunk.length).toBeLessThan(26 * 16000);
+    expect(vm.runInContext('processedSamples', context)).toBe(chunk.length);
+    expect(context.window.electronAPI.transcriptAppend).toHaveBeenCalledWith('Keep the whole sentence.');
+  });
+
+  test('caps a delayed live chunk at 30 seconds and consumes subsequent audio without gaps', async () => {
+    const { context, pcm } = recording(75);
+    pcm.fill(0, 29 * 16000, 30 * 16000);
+    pcm.fill(0, 58 * 16000, 59 * 16000);
+    await context.transcribeLiveChunk(false);
+    await context.transcribeLiveChunk(false);
+    await context.transcribeLiveChunk(true);
+    const chunks = context.window.rendererTranscription.transcribe.mock.calls.map(([chunk]) => chunk);
+    expect(chunks).toHaveLength(3);
+    expect(chunks[0].length).toBeLessThanOrEqual(30 * 16000);
+    expect(chunks[1].length).toBeLessThanOrEqual(30 * 16000);
+    expect(chunks.reduce((sum, chunk) => sum + chunk.length, 0)).toBe(pcm.length);
+    const combined = new Float32Array(pcm.length);
+    let offset = 0;
+    for (const chunk of chunks) {
+      combined.set(chunk, offset);
+      offset += chunk.length;
+    }
+    expect(Buffer.from(combined.buffer).equals(Buffer.from(pcm.buffer))).toBe(true);
+  });
+
+  test.each([0.5, 12, 31])('flushes all remaining audio at Stop, including a %ss recording', async (seconds) => {
+    const { context, pcm } = recording(seconds);
+    await context.transcribeLiveChunk(true);
+    const calls = context.window.rendererTranscription.transcribe.mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(Buffer.from(calls[0][0].buffer).equals(Buffer.from(pcm.buffer))).toBe(true);
+    expect(vm.runInContext('processedSamples', context)).toBe(pcm.length);
+  });
+});
+
 describe('transcript IPC source contract', () => {
   test('forwards raw-read options through the preload bridge', () => {
     let bridge;
