@@ -26,23 +26,25 @@ const { cleanTranscript, finalizeTranscript } = require('./public/js/transcript-
 //   - dev:      public/models/whisper-small.en/... (inside the project)
 //   - packaged: <resources>/models/whisper-small.en/... (shipped via extraResources,
 //               kept OUT of the asar to keep the archive small)
-// The decoder weight is the largest piece, so its presence is a reliable proxy for
-// "the model is installed".
+// Recording also requires both speaker models and their preprocessing configs.
 const MODEL_REL_PATH = path.join('whisper-small.en', 'onnx', 'decoder_model_merged_q4.onnx');
 
 // Resolve the model file for the current runtime. `app` is Electron's app module;
 // when packaged the model lives under process.resourcesPath/models, otherwise it
 // sits in the project's public/models directory (same path the static host serves).
-function modelPath(app) {
-  const modelsRoot = app && app.isPackaged
+function modelsRoot(app) {
+  return app && app.isPackaged
     ? path.join(process.resourcesPath, 'models')
     : path.join(__dirname, 'public', 'models');
-  return path.join(modelsRoot, MODEL_REL_PATH);
 }
 
 // Speech-to-text is available when the bundled model file is present.
 function isModelAvailable(app) {
-  return fs.existsSync(modelPath(app));
+  const root = modelsRoot(app);
+  return fs.existsSync(path.join(root, MODEL_REL_PATH)) &&
+    ['pyannote-segmentation-3.0', 'wespeaker-voxceleb-resnet34-LM'].every((name) =>
+      ['config.json', 'preprocessor_config.json', path.join('onnx', 'model_quantized.onnx')]
+        .every((file) => fs.existsSync(path.join(root, name, file))));
 }
 
 // ── CPU / thread tuning (retained helper) ────────────────────

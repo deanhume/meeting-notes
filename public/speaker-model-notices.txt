@@ -1,0 +1,25 @@
+Offline speaker-labeling models
+
+pyannote-segmentation-3.0
+Original model: pyannote/segmentation-3.0, pyannote contributors.
+Project copyright (c) 2020 CNRS.
+https://huggingface.co/pyannote/segmentation-3.0
+ONNX conversion and quantization: ONNX Community / Xenova.
+https://huggingface.co/onnx-community/pyannote-segmentation-3.0
+License: MIT. Full license is included in
+models/pyannote-segmentation-3.0/LICENSE.txt in the application resources.
+
+wespeaker-voxceleb-resnet34-LM
+Original model: WeSpeaker contributors; pyannote wrapper by pyannote contributors.
+https://github.com/wenet-e2e/wespeaker
+https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM
+ONNX conversion and quantization: ONNX Community / Xenova.
+https://huggingface.co/onnx-community/wespeaker-voxceleb-resnet34-LM
+License: Creative Commons Attribution 4.0 International (CC BY 4.0).
+https://creativecommons.org/licenses/by/4.0/
+Full license is included in models/wespeaker-voxceleb-resnet34-LM/LICENSE.txt
+in the application resources.
+
+This application redistributes the upstream quantized ONNX exports without
+further model modifications. No endorsement by the model authors is implied.
+Speaker embeddings are kept only in memory for the current recording.

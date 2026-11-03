@@ -207,7 +207,7 @@
               </select>
               <label><input type="checkbox" id="summaryEvidence" checked> Include supporting transcript passages</label>
               <button type="button" class="btn-ghost" id="regenerateSummary" disabled>Regenerate summary</button>
-              <span>Applies when recording stops, or when regenerating this session's summary. Review names, dates and corrections before relying on the notes.</span>
+              <span>Applies when recording stops, or when regenerating this session's summary. Transcript speaker labels are experimental and reset each recording; they do not identify people by name. Review names, dates and corrections before relying on the notes.</span>
             </div>
           </div>
           <div id="notePreviewPane" class="note-preview-pane hidden">
@@ -296,6 +296,7 @@
 
   <script src="/js/markdown.js"></script>
   <script src="/js/transcript-clean.js"></script>
+  <script src="/js/speaker-labels.js"></script>
   <script src="/js/summarizer.js"></script>
   <script type="importmap">
   {

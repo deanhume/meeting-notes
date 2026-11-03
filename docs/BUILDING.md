@@ -4,6 +4,11 @@
 
 To create a Windows installer (.exe):
 
+Run `npm run fetch-model` first to prepare Whisper, both quantized speaker
+models and their licenses. The existing `public/models` resource entry bundles
+all three model directories outside the asar. Pre/post-release checks reject
+missing speaker assets or attribution notices.
+
 ```bash
 npm run build
 ```

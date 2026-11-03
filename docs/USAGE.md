@@ -27,6 +27,21 @@ Toggle between light and dark themes using the theme toggle button at the bottom
 
 ## Recording Summaries
 
+Desktop recordings include experimental `Speaker 1`, `Speaker 2`, etc. labels
+in the transcript files under your data folder's `transcriptions` directory.
+Numbers are matched by voice within one recording, not to people in your
+organization, and reset for every new recording (marked in the file).
+Uncertain attribution is marked `Unknown speaker`; detected simultaneous
+speech is marked `Overlapping speakers`. Attribution uses whole timestamped
+speech segments, so a segment containing multiple speakers may be unknown.
+Labels are excluded from summary extraction rather than treated as action owners.
+Review them against the audio before relying on attribution.
+
+Speaker processing is entirely offline. Its two quantized models add about
+8.23 MB of model files, bundled in the installer with their license notices;
+there is no end-user model download. Voice embeddings stay in memory and are
+never saved or sent over the network.
+
 In the desktop app, stopping a recording produces an on-device, extractive
 summary. It separates discussion highlights, decisions, actions, tentative
 proposals and open questions. It uses selected source wording and a small set of

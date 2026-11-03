@@ -22,6 +22,7 @@
  */
 
 import { pipeline, env } from '/vendor/transformers/transformers.js';
+import { speakerDiarization } from './diarizer.js';
 
 // ── Offline configuration ─────────────────────────────────────
 // Never touch the Hugging Face hub: load the model from the app's own static
@@ -91,7 +92,7 @@ async function load() {
 /**
  * Transcribe 16 kHz mono PCM samples to raw text.
  * @param {Float32Array} pcm - mono Float32 samples at 16 kHz
- * @returns {Promise<string>} raw (un-cleaned) transcribed text
+ * @returns {Promise<string>} cleaned transcript with recording-local speaker labels
  */
 async function transcribe(pcm) {
   if (!pcm || pcm.length === 0) return '';
@@ -102,16 +103,21 @@ async function transcribe(pcm) {
   const out = await asr(pcm, {
     chunk_length_s: 30,
     stride_length_s: 5,
-    return_timestamps: false,
+    // The bundled export lacks the cross-attention outputs required for word
+    // timestamps. Attribute complete timestamped segments, not guessed words.
+    return_timestamps: true,
   });
-  return ((out && out.text) || '').trim();
+  const turns = await speakerDiarization.diarize(pcm);
+  return window.speakerLabelTools.labelTranscript(out, turns, window.cleanTranscript);
 }
 
 window.rendererTranscription = {
   // Whether on-device transcription can run here (Transformers.js loaded fine).
   isAvailable: () => true,
   // Kick off model loading ahead of first use (e.g. when recording starts).
-  warmup: () => load().catch((e) => console.warn('Transcription warmup failed:', e)),
+  warmup: () => Promise.all([load(), speakerDiarization.warmup()])
+    .catch((e) => console.warn('Transcription warmup failed:', e)),
+  resetSpeakers: () => speakerDiarization.reset(),
   transcribe,
   getBackend: () => backend,
   hasWebGPU,

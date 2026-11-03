@@ -1443,12 +1443,21 @@ async function startRecording() {
   processedSamples = 0;
   liveBusy = false;
   liveOpPromise = null;
+  window.rendererTranscription.resetSpeakers();
   // Start a fresh transcript file in the configured data folder. Transcribed
   // audio is appended here in chunks and read back to build the live summary.
   try {
     await window.electronAPI.transcriptStart(editingNoteId);
   } catch (e) {
     console.error('Could not start transcript file:', e);
+    cleanupRecordStream();
+    btn.classList.remove('recording');
+    document.getElementById('recordBtnLabel').textContent = 'Record';
+    setRecordStatus('Could not start transcript file.');
+    isStarting = false;
+    document.getElementById('regenerateSummary').disabled = !lastSummaryTranscript;
+    showError(`Could not start recording: ${e.message}`);
+    return;
   }
   // Start loading the on-device model now (if not already resident) so the first
   // live chunk doesn't wait on the full model load.
@@ -1598,21 +1607,19 @@ async function transcribeLiveChunk(force) {
       const chunkPcm = new Float32Array(pcm.subarray(processedSamples, cut));
       if (!chunkPcm.length) return;
 
-      const raw = await window.rendererTranscription.transcribe(chunkPcm);
-      const text = window.cleanTranscript(raw);
-      processedSamples = cut;
+      const text = await window.rendererTranscription.transcribe(chunkPcm);
       // Write the transcribed chunk to the transcript file (append, performant).
       // The rolling summary is produced separately by refreshSummaryFromFile().
       if (text) {
-        liveWordCount += text.split(/\s+/).filter(Boolean).length;
-        try {
-          await window.electronAPI.transcriptAppend(text);
-        } catch (e) {
-          console.error('Appending to transcript file failed:', e);
-        }
+        const appended = await window.electronAPI.transcriptAppend(text);
+        if (!appended) throw new Error('Transcript file is not available.');
+        liveWordCount += window.speakerLabelTools.stripSpeakerLabels(text).split(/\s+/).filter(Boolean).length;
       }
+      processedSamples = cut;
     } catch (e) {
       console.error('Live transcription chunk failed:', e);
+      if (force) throw e;
+      setRecordStatus('Transcription failed; will retry. Check the bundled speaker models.');
     } finally {
       liveBusy = false;
     }

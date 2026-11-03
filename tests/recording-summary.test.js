@@ -4,7 +4,7 @@ const vm = require('vm');
 
 function renderer() {
   const context = vm.createContext({ window: {}, Event: class { constructor(type) { this.type = type; } } });
-  for (const file of ['transcript-clean.js', 'summarizer.js', 'app.js']) {
+  for (const file of ['transcript-clean.js', 'speaker-labels.js', 'summarizer.js', 'app.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'js', file), 'utf8'), context);
   }
   const nodes = {
@@ -109,7 +109,7 @@ describe('recording chunk boundaries', () => {
     context.blobToPcm16kMono = jest.fn(async () => pcm);
     context.window.cleanTranscript = context.cleanTranscript;
     context.window.rendererTranscription = { transcribe: jest.fn(async () => 'Keep the whole sentence.') };
-    context.window.electronAPI = { transcriptAppend: jest.fn(async () => {}) };
+    context.window.electronAPI = { transcriptAppend: jest.fn(async () => true) };
     vm.runInContext('recordedChunks = [new Blob(["audio"])];', context);
     return { context, pcm };
   }
@@ -162,6 +162,27 @@ describe('recording chunk boundaries', () => {
     expect(Buffer.from(calls[0][0].buffer).equals(Buffer.from(pcm.buffer))).toBe(true);
     expect(vm.runInContext('processedSamples', context)).toBe(pcm.length);
   });
+
+  test('preserves labels when appending and excludes them from the word count', async () => {
+    const { context } = recording(12);
+    context.window.rendererTranscription.transcribe.mockResolvedValue('Speaker 1: Keep this.\nSpeaker 2: Ship Friday.');
+    await context.transcribeLiveChunk(true);
+    expect(context.window.electronAPI.transcriptAppend)
+      .toHaveBeenCalledWith('Speaker 1: Keep this.\nSpeaker 2: Ship Friday.');
+    expect(vm.runInContext('liveWordCount', context)).toBe(4);
+  });
+
+  test.each(['inference', 'append'])('does not consume audio after a final %s failure', async (stage) => {
+    const { context } = recording(12);
+    if (stage === 'inference') {
+      context.window.rendererTranscription.transcribe.mockRejectedValue(new Error('Model failed.'));
+    } else {
+      context.window.electronAPI.transcriptAppend.mockResolvedValue(false);
+    }
+    await expect(context.transcribeLiveChunk(true)).rejects.toThrow();
+    expect(vm.runInContext('processedSamples', context)).toBe(0);
+    expect(vm.runInContext('liveBusy', context)).toBe(false);
+  });
 });
 
 describe('transcript IPC source contract', () => {
@@ -189,7 +210,7 @@ describe('transcript IPC source contract', () => {
         ipcMain: { handle: (name, callback) => handlers.set(name, callback) }
       },
       path,
-      fs: { existsSync: () => true, readFileSync: () => raw },
+      fs: { existsSync: () => true, readFileSync: () => raw, appendFileSync: jest.fn() },
       express: () => {},
       'electron-updater': { autoUpdater: {} },
       './shared': { safeLoadJSON: () => ({ dataLocation: 'C:\\synthetic' }) },
@@ -203,6 +224,7 @@ describe('transcript IPC source contract', () => {
       }
     });
     handlers.get('transcript-start')({}, '123456789abc');
+    expect(dependencies.fs.appendFileSync.mock.calls[0][1]).toMatch(/speaker labels reset\]/);
     expect(handlers.get('transcript-read')({}, { raw: true })).toBe(raw);
     expect(handlers.get('transcript-read')({})).toBe(transcription.finalizeTranscript(raw));
   });

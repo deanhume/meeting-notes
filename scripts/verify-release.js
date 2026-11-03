@@ -5,6 +5,8 @@ const { spawnSync } = require('child_process');
 const asar = require('@electron/asar');
 const {
   MODEL_FILES,
+  SPEAKER_MODELS,
+  SPEAKER_MODEL_FILES,
   VENDOR_COPIES,
   modelDir,
   vendorDir,
@@ -38,13 +40,17 @@ function verifyTag() {
 }
 
 function verifyDependencies() {
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const result = spawnSync(npm, ['ls', '--omit=dev', '--depth=0'], {
+  const windows = process.platform === 'win32';
+  const command = windows ? (process.env.ComSpec || 'cmd.exe') : 'npm';
+  const args = windows
+    ? ['/d', '/s', '/c', 'npm ls --omit=dev --depth=0']
+    : ['ls', '--omit=dev', '--depth=0'];
+  const result = spawnSync(command, args, {
     cwd: rootDir,
     encoding: 'utf8',
   });
   if (result.status !== 0) {
-    const detail = (result.stdout || result.stderr || '').trim();
+    const detail = (result.stdout || result.stderr || result.error?.message || '').trim();
     fail(`Production dependencies are incomplete.\n${detail}`);
   }
 }
@@ -54,10 +60,20 @@ function verifyTranscriptionAssets(baseModelDir = modelDir, baseVendorDir = vend
     const minimumBytes = relativePath.endsWith('.onnx') ? 10 * 1024 * 1024 : 1;
     requireFile(path.join(baseModelDir, relativePath), minimumBytes);
   }
+  verifySpeakerAssets(path.dirname(baseModelDir));
+  requireFile(path.join(rootDir, 'public', 'speaker-model-notices.txt'));
   for (const { to } of VENDOR_COPIES) {
     requireFile(path.join(baseVendorDir, to));
   }
   requireFile(path.join(baseVendorDir, 'ort-common', 'env-impl.js'));
+}
+
+function verifySpeakerAssets(modelsRoot) {
+  for (const { name } of SPEAKER_MODELS) {
+    for (const file of [...SPEAKER_MODEL_FILES, 'LICENSE.txt']) {
+      requireFile(path.join(modelsRoot, name, file), file.endsWith('.onnx') ? 1024 * 1024 : 1);
+    }
+  }
 }
 
 function sha512Base64(filePath) {
@@ -91,6 +107,14 @@ function verifyPackagedModules(asarPath) {
   }
   if (!packagedFiles.has('/public/vendor/transformers/ort-common/env-impl.js')) {
     fail('Packaged app is missing the ONNX Runtime common modules');
+  }
+  for (const file of ['diarizer.js', 'speaker-labels.js']) {
+    if (!packagedFiles.has(`/public/js/${file}`)) {
+      fail(`Packaged app is missing speaker-labeling runtime: ${file}`);
+    }
+  }
+  if (!packagedFiles.has('/public/speaker-model-notices.txt')) {
+    fail('Packaged app is missing speaker model attribution');
   }
 }
 
@@ -126,6 +150,7 @@ function verifyPostbuild() {
   }
 
   verifyPackagedModules(asarPath);
+  verifySpeakerAssets(path.join(distDir, 'win-unpacked', 'resources', 'models'));
   for (const relativePath of MODEL_FILES) {
     const minimumBytes = relativePath.endsWith('.onnx') ? 10 * 1024 * 1024 : 1;
     requireFile(

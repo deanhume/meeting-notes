@@ -120,6 +120,16 @@ function isIncompleteFragment(prev) {
 
 function finalizeTranscript(text) {
   if (!text) return '';
+  if (/^(?:(?:Speaker \d+|Unknown speaker|Overlapping speakers):|\[Recording started: [^\]\r\n]+; speaker labels reset\]$)/m.test(text)) {
+    // Preserve turn boundaries rather than merging one speaker's fragment with another.
+    return text.split(/\r?\n/).map((line) => {
+      if (/^\[Recording started: [^\]\r\n]+; speaker labels reset\]$/.test(line)) return line;
+      const match = line.match(/^((?:Speaker \d+|Unknown speaker|Overlapping speakers):)\s*(.*)$/);
+      if (!match) return finalizeTranscript(line);
+      const cleaned = normalizeWhitespace(collapseRepeats(match[2]));
+      return cleaned ? `${match[1]} ${cleaned}` : '';
+    }).filter(Boolean).join('\n');
+  }
   const source = text
     .split(/\r?\n/)
     .map((l) => l.trim())

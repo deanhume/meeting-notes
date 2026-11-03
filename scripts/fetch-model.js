@@ -9,6 +9,8 @@
  *   2. Fetches the quantised (q4) ONNX build of Whisper small (English-only) from
  *      the Hugging Face hub into `public/models/whisper-small.en/`, laid out exactly
  *      the way Transformers.js expects to load a *local* model.
+ *   3. Fetches the q8 speaker segmentation and embedding models (~8.23 MB)
+ *      plus their licenses for recording-local, offline speaker labels.
  *
  * Neither the model (~290 MB) nor the vendored runtime is committed to git. Run
  * this once after cloning and before building the installer: `npm run fetch-model`.
@@ -47,6 +49,18 @@ const MODEL_FILES = [
   'onnx/decoder_model_merged_q4.onnx',
 ];
 
+const SPEAKER_MODELS = [
+  {
+    name: 'pyannote-segmentation-3.0',
+    licenseUrl: 'https://raw.githubusercontent.com/pyannote/pyannote-audio/develop/LICENSE',
+  },
+  {
+    name: 'wespeaker-voxceleb-resnet34-LM',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/legalcode.txt',
+  },
+];
+const SPEAKER_MODEL_FILES = ['config.json', 'preprocessor_config.json', 'onnx/model_quantized.onnx'];
+
 // Runtime files copied verbatim from node_modules. The renderer loads these via an
 // import map (see public/index.html); the ORT `asyncify` WASM covers both the
 // WebGPU and WASM-CPU execution paths.
@@ -80,15 +94,14 @@ function vendorRuntime() {
   console.log(`  ${CHECK} ort-common/`);
 }
 
-async function fetchFile(relPath) {
-  const destPath = path.join(modelDir, relPath);
+async function fetchFile(relPath, directory = modelDir, url = BASE_URL + relPath) {
+  const destPath = path.join(directory, relPath);
   if (fs.existsSync(destPath)) {
     console.log(`  ${CHECK} ${relPath} (already present)`);
     return;
   }
   fs.mkdirSync(path.dirname(destPath), { recursive: true });
 
-  const url = BASE_URL + relPath;
   const res = await fetch(url); // follows redirects automatically
   if (!res.ok || !res.body) {
     throw new Error(`Download failed for ${relPath}: ${res.status} ${res.statusText}`);
@@ -108,6 +121,14 @@ async function main() {
   for (const relPath of MODEL_FILES) {
     await fetchFile(relPath);
   }
+  for (const { name, licenseUrl } of SPEAKER_MODELS) {
+    const directory = path.join(publicDir, 'models', name);
+    console.log(`Fetching ${name} (q8) into ${directory} ...`);
+    for (const file of SPEAKER_MODEL_FILES) {
+      await fetchFile(file, directory, `https://huggingface.co/onnx-community/${name}/resolve/main/${file}`);
+    }
+    await fetchFile('LICENSE.txt', directory, licenseUrl);
+  }
   console.log('Transcription assets ready.');
 }
 
@@ -120,6 +141,8 @@ if (require.main === module) {
 
 module.exports = {
   MODEL_FILES,
+  SPEAKER_MODELS,
+  SPEAKER_MODEL_FILES,
   VENDOR_COPIES,
   modelDir,
   vendorDir,

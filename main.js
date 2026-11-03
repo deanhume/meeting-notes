@@ -275,6 +275,8 @@ ipcMain.handle('transcript-start', (_event, noteId) => {
   if (!fs.existsSync(currentTranscriptPath)) {
     fs.writeFileSync(currentTranscriptPath, '', 'utf8');
   }
+  fs.appendFileSync(currentTranscriptPath,
+    `\n[Recording started: ${new Date().toISOString()}; speaker labels reset]\n`, 'utf8');
   return path.basename(currentTranscriptPath);
 });
 

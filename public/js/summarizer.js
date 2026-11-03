@@ -90,6 +90,9 @@ function tidySentence(s) {
 // and the one-sentence-per-line shape that the Whisper cleanup already produces.
 function splitSentences(text) {
   return text
+    // Speaker numbers are recording-local metadata, never named action owners.
+    .replace(/^(?:Speaker \d+|Unknown speaker|Overlapping speakers):\s*/gm, '')
+    .replace(/^\[Recording started: [^\]\r\n]+; speaker labels reset\]\s*$/gm, '')
     .split(/(?<=[.!?])\s+|\n+/)
     .map((s) => s.trim())
     .filter(Boolean);
